@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { FaWallet, FaStore, FaRocket } from 'react-icons/fa';
 import Link from 'next/link';
 import { useWeb3Auth } from '@/context/Web3AuthContext';
 import { useRouter } from 'next/navigation';
@@ -170,7 +171,7 @@ export default function Home() {
                       <div className="pt-4 border-t border-(--onyx-grey-lighter)/20">
                         <div className="text-sm font-semibold flex justify-between">
                           <span>Total Sales</span>
-                          <span className="text-(--accent-gold)">$0</span>
+                          <span className="text-(--accent-gold)">$950</span>
                         </div>
                       </div>
                     </div>
@@ -298,14 +299,14 @@ export default function Home() {
       </section>
 
       {/* How It Works Section */}
-      <section className="section">
+      <section className="section bg-linear-to-b from-white to-gray-50 py-20">
         <div className="container-custom">
           <motion.div
             variants={containerVariants}
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true }}
-            className="mb-16"
+            className="mb-20"
           >
             <motion.h2
               variants={itemVariants}
@@ -326,49 +327,44 @@ export default function Home() {
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true }}
-            className="grid grid-cols-1 md:grid-cols-3 gap-8"
+            className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-6 relative"
           >
             {[
               {
-                number: '01',
+                icon: <FaWallet size={40} className="text-indigo-600" />, 
                 title: 'Connect Wallet',
                 description: 'Connect your Web3 wallet to get started. We support all major wallets on Mantle Network.',
+                step: '01',
               },
               {
-                number: '02',
+                icon: <FaStore size={40} className="text-green-600" />, 
                 title: 'Design Your Store',
                 description: 'Choose a template or start from scratch. Use our drag-and-drop editor to customize.',
+                step: '02',
               },
               {
-                number: '03',
+                icon: <FaRocket size={40} className="text-pink-600" />, 
                 title: 'Add Products & Launch',
                 description: 'Add your products with images and details. Launch and start selling immediately.',
+                step: '03',
               },
-            ].map((step, index) => (
+            ].map((item, idx) => (
               <motion.div
-                key={index}
+                key={idx}
                 variants={itemVariants}
                 className="relative"
               >
-                <div className="flex flex-col items-center text-center">
-                  <motion.div
-                    className="w-16 h-16 rounded-full bg-(--onyx-stone) text-(--onyx-white) flex items-center justify-center text-2xl font-bold mb-6"
-                    whileHover={{ scale: 1.1 }}
-                  >
-                    {step.number}
-                  </motion.div>
-                  <h3 className="text-xl font-semibold text-(--onyx-black) mb-3">
-                    {step.title}
+                <div className="bg-white rounded-xl shadow-lg p-8 flex flex-col items-center transition-transform hover:scale-105 hover:shadow-2xl h-full">
+                  
+                  <div className="mb-6 mt-2">{item.icon}</div>
+                  <h3 className="text-xl font-semibold mb-3 text-center text-(--onyx-black)">
+                    {item.title}
                   </h3>
-                  <p className="text-(--onyx-grey) leading-relaxed">
-                    {step.description}
+                  <p className="text-(--onyx-grey) text-center text-sm leading-relaxed">
+                    {item.description}
                   </p>
                 </div>
 
-                {/* Connector Line */}
-                {index < 2 && (
-                  <div className="hidden md:block absolute top-16 left-[60%] w-[40%] h-0.5 bg-linear-to-r from-(--onyx-stone) to-transparent"></div>
-                )}
               </motion.div>
             ))}
           </motion.div>
