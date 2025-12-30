@@ -14,19 +14,7 @@ import {
   Square,
   Folder,
 } from 'phosphor-react';
-
-interface CanvasElement {
-  id: string;
-  type: 'text' | 'image' | 'button' | 'container';
-  content?: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  color?: string;
-  backgroundColor?: string;
-  fontSize?: number;
-}
+import { TEMPLATE_ELEMENTS, type CanvasElement } from '../templates';
 
 export default function StoreEditor() {
   const router = useRouter();
@@ -35,28 +23,44 @@ export default function StoreEditor() {
   const template = searchParams.get('template') || 'minimal';
 
   const canvasRef = useRef<HTMLDivElement>(null);
-  const [elements, setElements] = useState<CanvasElement[]>([
-    {
-      id: '1',
-      type: 'text',
-      content: 'Welcome to ' + storeName,
-      x: 50,
-      y: 50,
-      width: 500,
-      height: 80,
-      fontSize: 48,
-    },
-    {
-      id: '2',
-      type: 'text',
-      content: 'Discover our amazing products',
-      x: 50,
-      y: 150,
-      width: 400,
-      height: 40,
-      fontSize: 20,
-    },
-  ]);
+  
+  const getInitialElements = () => {
+    const templateElements = TEMPLATE_ELEMENTS[template as keyof typeof TEMPLATE_ELEMENTS];
+    if (templateElements) {
+      // Update the store name in the first element if it's text
+      return templateElements.map((el: CanvasElement, index: number) => {
+        if (index === 0 && el.type === 'text') {
+          return { ...el, content: storeName };
+        }
+        return el;
+      });
+    }
+    // Fallback to basic elements
+    return [
+      {
+        id: '1',
+        type: 'text' as const,
+        content: storeName,
+        x: 50,
+        y: 50,
+        width: 500,
+        height: 80,
+        fontSize: 48,
+      },
+      {
+        id: '2',
+        type: 'text' as const,
+        content: 'Discover our amazing products',
+        x: 50,
+        y: 150,
+        width: 400,
+        height: 40,
+        fontSize: 20,
+      },
+    ];
+  };
+
+  const [elements, setElements] = useState<CanvasElement[]>(getInitialElements);
   const [selectedId, setSelectedId] = useState<string | null>('1');
   const [isPreviewMode, setIsPreviewMode] = useState(false);
 
@@ -326,11 +330,20 @@ export default function StoreEditor() {
                       ? 'ring-2 ring-(--onyx-stone) bg-(--onyx-grey-lighter)/20'
                       : 'hover:ring-1 hover:ring-(--onyx-grey-light)'
                   }`}
+                  drag
+                  dragMomentum={false}
+                  dragElastic={0}
+                  onDragEnd={(e, info) => {
+                    updateElement(element.id, {
+                      x: Math.round(element.x + info.offset.x),
+                      y: Math.round(element.y + info.offset.y),
+                    });
+                  }}
                   style={{
-                    left: `${element.x}px`,
-                    top: `${element.y}px`,
-                    width: `${element.width}px`,
-                    height: `${element.height}px`,
+                    left: element.x,
+                    top: element.y,
+                    width: element.width,
+                    height: element.height,
                     backgroundColor: element.backgroundColor,
                     color: element.color || 'black',
                     fontSize: element.fontSize ? `${element.fontSize}px` : undefined,
@@ -342,13 +355,6 @@ export default function StoreEditor() {
                         ? `2px solid var(--onyx-stone)`
                         : '2px solid transparent',
                     borderRadius: element.type === 'button' ? '8px' : '0px',
-                  }}
-                  draggable
-                  onDragEnd={(e, info) => {
-                    updateElement(element.id, {
-                      x: element.x + info.offset.x,
-                      y: element.y + info.offset.y,
-                    });
                   }}
                 >
                   {element.content || `[${element.type}]`}
