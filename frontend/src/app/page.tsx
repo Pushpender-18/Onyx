@@ -92,8 +92,9 @@ export default function Home() {
             <div className="space-y-6">
               <motion.div variants={itemVariants}>
                 <div className="inline-block px-4 py-2 bg-(--onyx-grey-lighter) rounded-full">
-                  <span className="text-xs font-semibold text-(--onyx-stone)">
-                    ✨ Built on Mantle Network
+                  <span className="text-xs font-semibold text-(--onyx-stone) flex items-center gap-2">
+                    <span className="inline-block w-2 h-2 bg-black rounded-full animate-pulse"></span>
+                    Built on Mantle Network
                   </span>
                 </div>
               </motion.div>

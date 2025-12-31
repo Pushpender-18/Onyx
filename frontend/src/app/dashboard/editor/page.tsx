@@ -1,369 +1,1936 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
-import { motion, Reorder } from 'framer-motion';
+import React, { useState, useCallback, useMemo, useRef, useEffect, useTransition } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
   Eye,
   FloppyDisk,
-  Plus,
   Trash,
-  TextT,
-  Image,
-  Square,
-  Folder,
+  MagnifyingGlass,
+  FunnelSimple,
+  Plus,
+  X,
+  ShoppingCart,
+  House,
+  Storefront,
+  Upload,
+  PencilSimple,
+  XCircle,
+  Question,
+  EnvelopeSimple,
 } from 'phosphor-react';
-import { TEMPLATE_ELEMENTS, type CanvasElement } from '../templates';
+
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  image: string;
+  category: string;
+  description: string;
+}
+
+interface StoreData {
+  storeName: string;
+  heroTitle: string;
+  heroSubtitle: string;
+  heroImage: string;
+  products: Product[];
+  categories: string[];
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  aboutText: string;
+  contactEmail: string;
+}
+
+const UNSPLASH_PRODUCTS = [
+  {
+    id: '1',
+    name: 'Ceramic Bowl',
+    price: 45.99,
+    image: 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop',
+    category: 'Ceramics',
+    description: 'Beautiful handmade ceramic bowl perfect for displaying fruits or serving dishes.',
+  },
+  {
+    id: '2',
+    name: 'Woven Textile',
+    price: 32.99,
+    image: 'https://images.unsplash.com/photo-1611087620459-cd7cea4ae4a0?w=500&h=500&fit=crop',
+    category: 'Textiles',
+    description: 'Premium handwoven textile with authentic patterns and natural dyes.',
+  },
+  {
+    id: '3',
+    name: 'Wooden Furniture',
+    price: 199.99,
+    image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=500&h=500&fit=crop',
+    category: 'Furniture',
+    description: 'Solid wood furniture piece crafted with sustainable materials.',
+  },
+  {
+    id: '4',
+    name: 'Decorative Vase',
+    price: 67.50,
+    image: 'https://images.unsplash.com/photo-1578500494198-246f612d03b3?w=500&h=500&fit=crop',
+    category: 'Ceramics',
+    description: 'Modern decorative vase with unique glaze finish.',
+  },
+  {
+    id: '5',
+    name: 'Wall Tapestry',
+    price: 55.00,
+    image: 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop',
+    category: 'Textiles',
+    description: 'Colorful wall tapestry featuring traditional motifs.',
+  },
+  {
+    id: '6',
+    name: 'Dining Table',
+    price: 450.00,
+    image: 'https://images.unsplash.com/photo-1551632786-de41ec16caf0?w=500&h=500&fit=crop',
+    category: 'Furniture',
+    description: 'Elegant dining table for six with natural finish.',
+  },
+];
+
+const INITIAL_STORE_DATA: StoreData = {
+  storeName: 'ECHO Store',
+  heroTitle: 'Curated Goods for a Simpler Life',
+  heroSubtitle: 'Discover handpicked products that celebrate craftsmanship and quality',
+  heroImage: 'https://images.unsplash.com/photo-1556740730-a0fbc0454d0a?w=1200&h=600&fit=crop',
+  products: UNSPLASH_PRODUCTS,
+  categories: ['All', 'Ceramics', 'Textiles', 'Furniture'],
+  primaryColor: '#ffffff',
+  secondaryColor: '#f8f8f8',
+  accentColor: '#c97a5a',
+  aboutText: 'We believe in craftsmanship and quality. Every product in our collection is handpicked to celebrate the artistry of makers around the world.',
+  contactEmail: 'hello@echostore.com',
+};
+
+type PageType = 'home' | 'shop' | 'product' | 'about' | 'contact' | 'cart' | 'checkout';
 
 export default function StoreEditor() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const storeName = searchParams.get('storeName') || 'My Store';
-  const template = searchParams.get('template') || 'minimal';
 
-  const canvasRef = useRef<HTMLDivElement>(null);
-  
-  const getInitialElements = () => {
-    const templateElements = TEMPLATE_ELEMENTS[template as keyof typeof TEMPLATE_ELEMENTS];
-    if (templateElements) {
-      // Update the store name in the first element if it's text
-      return templateElements.map((el: CanvasElement, index: number) => {
-        if (index === 0 && el.type === 'text') {
-          return { ...el, content: storeName };
-        }
-        return el;
-      });
-    }
-    // Fallback to basic elements
-    return [
-      {
-        id: '1',
-        type: 'text' as const,
-        content: storeName,
-        x: 50,
-        y: 50,
-        width: 500,
-        height: 80,
-        fontSize: 48,
-      },
-      {
-        id: '2',
-        type: 'text' as const,
-        content: 'Discover our amazing products',
-        x: 50,
-        y: 150,
-        width: 400,
-        height: 40,
-        fontSize: 20,
-      },
-    ];
-  };
-
-  const [elements, setElements] = useState<CanvasElement[]>(getInitialElements);
-  const [selectedId, setSelectedId] = useState<string | null>('1');
+  const [storeData, setStoreData] = useState<StoreData>({
+    ...INITIAL_STORE_DATA,
+    storeName: storeName,
+  });
+  const [currentPage, setCurrentPage] = useState<PageType>('home');
   const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [showFilters, setShowFilters] = useState(false);
+  const [cartItems, setCartItems] = useState<{ id: string; quantity: number }[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [showImageUploadModal, setShowImageUploadModal] = useState(false);
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [cropScale, setCropScale] = useState(1);
+  const [cropOffsetX, setCropOffsetX] = useState(0);
+  const [cropOffsetY, setCropOffsetY] = useState(0);
+  const [imageUploadMode, setImageUploadMode] = useState<'upload' | 'url'>('upload');
+  const [showHeroImageUploadModal, setShowHeroImageUploadModal] = useState(false);
+  const [heroUploadedImage, setHeroUploadedImage] = useState<string | null>(null);
+  const [isHeroImageUpload, setIsHeroImageUpload] = useState(false);
 
-  const selectedElement = elements.find((el) => el.id === selectedId);
+  const filteredProducts = storeData.products.filter((product) => {
+    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
 
-  const addElement = (type: CanvasElement['type']) => {
-    const newElement: CanvasElement = {
-      id: Date.now().toString(),
-      type,
-      content: type === 'text' ? 'New Text' : undefined,
-      x: 50,
-      y: elements.length * 100 + 50,
-      width: 200,
-      height: 60,
-      fontSize: type === 'text' ? 16 : undefined,
-    };
-    setElements([...elements, newElement]);
-    setSelectedId(newElement.id);
+  const updateStoreData = (updates: Partial<StoreData>) => {
+    setStoreData((prev) => ({ ...prev, ...updates }));
   };
 
-  const updateElement = (id: string, updates: Partial<CanvasElement>) => {
-    setElements(elements.map((el) => (el.id === id ? { ...el, ...updates } : el)));
-  };
-
-  const deleteElement = (id: string) => {
-    setElements(elements.filter((el) => el.id !== id));
-    setSelectedId(null);
-  };
-
-  const handleSave = () => {
-    console.log('Saving store:', {
-      name: storeName,
-      template,
-      elements,
+  const addToCart = (productId: string) => {
+    setCartItems((prev) => {
+      const existing = prev.find((item) => item.id === productId);
+      if (existing) {
+        return prev.map((item) =>
+          item.id === productId ? { ...item, quantity: item.quantity + 1 } : item
+        );
+      }
+      return [...prev, { id: productId, quantity: 1 }];
     });
-    alert('Store saved! Redirecting to dashboard...');
-    router.push('/dashboard/stores');
   };
 
+  const removeFromCart = (productId: string) => {
+    setCartItems((prev) => prev.filter((item) => item.id !== productId));
+  };
+
+  const updateProduct = (updatedProduct: Product) => {
+    setStoreData((prev) => ({
+      ...prev,
+      products: prev.products.map((p) =>
+        p.id === updatedProduct.id ? updatedProduct : p
+      ),
+    }));
+    setEditingProduct(null);
+    setShowProductModal(false);
+  };
+
+  const deleteProduct = (productId: string) => {
+    setStoreData((prev) => ({
+      ...prev,
+      products: prev.products.filter((p) => p.id !== productId),
+    }));
+  };
+
+  const addNewProduct = () => {
+    const newProduct: Product = {
+      id: Date.now().toString(),
+      name: 'New Product',
+      price: 0,
+      image: 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop',
+      category: storeData.categories[1] || 'General',
+      description: 'Product description',
+    };
+    setEditingProduct(newProduct);
+    setShowProductModal(true);
+  };
+
+  // Professional Navbar Component
+  const Navbar = () => (
+    <div
+      className="sticky top-0 z-40 border-b"
+      style={{ backgroundColor: storeData.primaryColor, borderColor: '#e5e7eb' }}
+    >
+      <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-8">
+          <h1 className="text-2xl font-bold" style={{ color: storeData.accentColor }}>
+            {storeData.storeName}
+          </h1>
+          <nav className="hidden md:flex items-center gap-8">
+            {[
+              { label: 'HOME', icon: House, page: 'home' as PageType },
+              { label: 'SHOP', icon: Storefront, page: 'shop' as PageType },
+              { label: 'ABOUT', icon: Question, page: 'about' as PageType },
+              { label: 'CONTACT', icon: EnvelopeSimple, page: 'contact' as PageType },
+            ].map((item) => (
+              <button
+                key={item.page}
+                onClick={() => setCurrentPage(item.page)}
+                className="text-sm font-semibold transition-colors hover:opacity-70 flex items-center gap-2"
+                style={{ color: currentPage === item.page ? storeData.accentColor : '#666' }}
+              >
+                <item.icon size={18} />
+                {item.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+        <button
+          onClick={() => setCurrentPage('cart')}
+          className="relative px-6 py-2 rounded font-semibold text-white text-sm transition-all hover:shadow-lg flex items-center gap-2"
+          style={{ backgroundColor: storeData.accentColor }}
+        >
+          <ShoppingCart size={18} />
+          CART ({cartItems.length})
+        </button>
+      </div>
+    </div>
+  );
+
+  // Hero Section
+  const HeroSection = () => (
+    <div
+      className="relative h-96 overflow-hidden rounded-xl shadow-lg"
+      style={{
+        backgroundImage: `url('${storeData.heroImage}')`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}
+    >
+      <div
+        className="absolute inset-0"
+        style={{
+          background: 'linear-gradient(135deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.2) 100%)',
+        }}
+      />
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-white px-6">
+        <motion.h2
+          className="text-5xl md:text-6xl font-bold mb-4 leading-tight"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          {storeData.heroTitle}
+        </motion.h2>
+        <motion.p
+          className="text-lg md:text-xl mb-8 max-w-2xl font-light"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          {storeData.heroSubtitle}
+        </motion.p>
+        <motion.button
+          className="px-8 py-3 rounded font-semibold text-white transition-all hover:shadow-lg"
+          style={{ backgroundColor: storeData.accentColor }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          onClick={() => setCurrentPage('shop')}
+        >
+          EXPLORE COLLECTION
+        </motion.button>
+      </div>
+    </div>
+  );
+
+  // Category Filter Section
+  const CategoryFilter = () => (
+    <div
+      className="py-12 border-b"
+      style={{ backgroundColor: storeData.secondaryColor }}
+    >
+      <div className="max-w-7xl mx-auto px-6">
+        <h3 className="text-sm font-bold text-gray-600 mb-6 uppercase tracking-widest">
+          Categories
+        </h3>
+        <div className="flex flex-wrap gap-4">
+          {storeData.categories.map((category) => (
+            <button
+              key={category}
+              onClick={() => setSelectedCategory(category)}
+              className={`px-6 py-2 rounded-lg font-semibold text-sm transition-all ${
+                selectedCategory === category
+                  ? 'text-white shadow-lg'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400'
+              }`}
+              style={{
+                backgroundColor:
+                  selectedCategory === category ? storeData.accentColor : undefined,
+              }}
+            >
+              {category}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  // Search Bar
+  const SearchFilterBar = () => (
+    <div
+      className="py-8 border-b"
+      style={{ backgroundColor: storeData.primaryColor, borderColor: '#e5e7eb' }}
+    >
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="flex items-center gap-4">
+          <div className="flex-1 relative">
+            <MagnifyingGlass
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              size={20}
+            />
+            <input
+              type="text"
+              placeholder="Search products..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
+              style={{ '--tw-ring-color': storeData.accentColor } as any}
+            />
+          </div>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="flex items-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <FunnelSimple size={20} />
+            <span className="font-semibold text-sm">Filter</span>
+          </button>
+        </div>
+
+        <AnimatePresence>
+          {showFilters && (
+            <motion.div
+              className="mt-6 p-4 border border-gray-200 rounded-lg"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+            >
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-2 uppercase">
+                    Sort By
+                  </label>
+                  <select className="w-full px-3 py-2 border border-gray-300 rounded text-sm">
+                    <option>Newest</option>
+                    <option>Price: Low to High</option>
+                    <option>Price: High to Low</option>
+                    <option>Best Sellers</option>
+                  </select>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+
+  // Products Grid
+  const ProductsSection = () => (
+    <div className="py-16">
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="mb-12">
+          <h2 className="text-4xl font-bold mb-2">Curated Collection</h2>
+          <p className="text-gray-600">
+            Showing {filteredProducts.length} of {storeData.products.length} products
+          </p>
+        </div>
+
+        {filteredProducts.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500 text-lg">No products found matching your criteria</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {filteredProducts.map((product) => (
+              <motion.div
+                key={product.id}
+                className="group rounded-lg overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 cursor-pointer"
+                whileHover={{ y: -8 }}
+                onClick={() => {
+                  setSelectedProduct(product);
+                  setCurrentPage('product');
+                }}
+              >
+                <div className="relative overflow-hidden h-64 bg-gray-100">
+                  <img
+                    src={product.image}
+                    alt={product.name}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  />
+                  <div
+                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                    style={{
+                      background: `linear-gradient(135deg, ${storeData.accentColor}dd 0%, ${storeData.accentColor} 100%)`,
+                    }}
+                  >
+                    <button
+                      className="px-6 py-2 bg-white rounded font-semibold text-sm transition-all hover:shadow-lg"
+                      style={{ color: storeData.accentColor }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedProduct(product);
+                        setCurrentPage('product');
+                      }}
+                    >
+                      Quick View
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-6">
+                  <div className="mb-3">
+                    <span
+                      className="inline-block text-xs font-bold px-3 py-1 rounded-full text-white"
+                      style={{ backgroundColor: storeData.accentColor }}
+                    >
+                      {product.category}
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-bold mb-1">{product.name}</h3>
+                  <p className="text-gray-600 text-sm mb-4 line-clamp-2">{product.description}</p>
+                  <div className="flex items-center justify-between">
+                    <span
+                      className="text-2xl font-bold"
+                      style={{ color: storeData.accentColor }}
+                    >
+                      ${product.price.toFixed(2)}
+                    </span>
+                    <button
+                      className="px-4 py-2 rounded font-semibold text-white text-sm transition-all hover:shadow-lg"
+                      style={{ backgroundColor: storeData.accentColor }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        addToCart(product.id);
+                      }}
+                    >
+                      Add to Cart
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // Product Detail Page
+  const ProductDetailPage = () => {
+    if (!selectedProduct) return null;
+
+    return (
+      <div className="py-16">
+        <div className="max-w-7xl mx-auto px-6">
+          <button
+            onClick={() => setCurrentPage('shop')}
+            className="mb-8 flex items-center gap-2 px-4 py-2 text-gray-700 hover:text-gray-900"
+          >
+            <ArrowLeft size={20} />
+            Back to Shop
+          </button>
+
+          <div className="grid md:grid-cols-2 gap-12">
+            {/* Product Image */}
+            <motion.div
+              className="rounded-lg overflow-hidden bg-gray-100"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+            >
+              <img
+                src={selectedProduct.image}
+                alt={selectedProduct.name}
+                className="w-full h-full object-cover"
+              />
+            </motion.div>
+
+            {/* Product Info */}
+            <motion.div
+              className="flex flex-col justify-center"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+            >
+              <div className="mb-6">
+                <span
+                  className="inline-block text-sm font-bold px-4 py-1 rounded-full text-white mb-4"
+                  style={{ backgroundColor: storeData.accentColor }}
+                >
+                  {selectedProduct.category}
+                </span>
+                <h1 className="text-5xl font-bold mb-2">{selectedProduct.name}</h1>
+                <p className="text-gray-600 text-lg">{selectedProduct.description}</p>
+              </div>
+
+              <div className="mb-8">
+                <div className="flex items-baseline gap-2">
+                  <span
+                    className="text-5xl font-bold"
+                    style={{ color: storeData.accentColor }}
+                  >
+                    ${selectedProduct.price.toFixed(2)}
+                  </span>
+                  <span className="text-gray-500">USD</span>
+                </div>
+              </div>
+
+              <div className="space-y-4 mb-8">
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Quantity</label>
+                  <div className="flex items-center gap-4 w-fit border border-gray-300 rounded-lg p-2">
+                    <button className="text-xl hover:opacity-70">−</button>
+                    <span className="w-8 text-center">1</span>
+                    <button className="text-xl hover:opacity-70">+</button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  onClick={() => addToCart(selectedProduct.id)}
+                  className="flex-1 px-8 py-4 rounded font-semibold text-white text-lg transition-all hover:shadow-lg"
+                  style={{ backgroundColor: storeData.accentColor }}
+                >
+                  Add to Cart
+                </button>
+                <button
+                  className="flex-1 px-8 py-4 rounded font-semibold border-2 transition-all"
+                  style={{ borderColor: storeData.accentColor, color: storeData.accentColor }}
+                >
+                  Save for Later
+                </button>
+              </div>
+
+              <div className="mt-12 pt-8 border-t border-gray-300">
+                <h3 className="text-xl font-bold mb-4">Details</h3>
+                <ul className="space-y-3 text-gray-700">
+                  <li className="flex justify-between">
+                    <span>Category:</span>
+                    <strong>{selectedProduct.category}</strong>
+                  </li>
+                  <li className="flex justify-between">
+                    <span>SKU:</span>
+                    <strong>{selectedProduct.id}</strong>
+                  </li>
+                  <li className="flex justify-between">
+                    <span>In Stock:</span>
+                    <strong style={{ color: storeData.accentColor }}>Yes</strong>
+                  </li>
+                </ul>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // About Page
+  const AboutPage = () => (
+    <div className="py-16">
+      <div className="max-w-4xl mx-auto px-6">
+        <button
+          onClick={() => setCurrentPage('home')}
+          className="mb-8 flex items-center gap-2 px-4 py-2 text-gray-700 hover:text-gray-900"
+        >
+          <ArrowLeft size={20} />
+          Back
+        </button>
+
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <h1 className="text-5xl font-bold mb-8">About Us</h1>
+          <div className="prose prose-lg max-w-none">
+            <p className="text-xl text-gray-700 leading-relaxed mb-6">
+              {storeData.aboutText}
+            </p>
+            <p className="text-gray-600 leading-relaxed mb-6">
+              Since our founding, we have been committed to bringing you the finest curated goods from artisans and makers
+              around the world. Each product is carefully selected to ensure it meets our high standards for quality,
+              craftsmanship, and sustainability.
+            </p>
+            <p className="text-gray-600 leading-relaxed">
+              We believe that buying mindfully means choosing quality over quantity. Our products are designed to last,
+              bringing joy and functionality to your home for years to come.
+            </p>
+          </div>
+        </motion.div>
+      </div>
+    </div>
+  );
+
+  // Contact Page
+  const ContactPage = () => (
+    <div className="py-16">
+      <div className="max-w-2xl mx-auto px-6">
+        <button
+          onClick={() => setCurrentPage('home')}
+          className="mb-8 flex items-center gap-2 px-4 py-2 text-gray-700 hover:text-gray-900"
+        >
+          <ArrowLeft size={20} />
+          Back
+        </button>
+
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <h1 className="text-5xl font-bold mb-4">Contact Us</h1>
+          <p className="text-xl text-gray-600 mb-12">
+            We would love to hear from you. Get in touch with us today!
+          </p>
+
+          <form className="space-y-6">
+            <div>
+              <label className="block text-sm font-semibold mb-2">Name</label>
+              <input
+                type="text"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
+                placeholder="Your name"
+                style={{ '--tw-ring-color': storeData.accentColor } as any}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold mb-2">Email</label>
+              <input
+                type="email"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
+                placeholder="your@email.com"
+                style={{ '--tw-ring-color': storeData.accentColor } as any}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold mb-2">Message</label>
+              <textarea
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
+                placeholder="Your message"
+                rows={6}
+                style={{ '--tw-ring-color': storeData.accentColor } as any}
+              />
+            </div>
+            <button
+              type="submit"
+              className="w-full px-6 py-3 rounded font-semibold text-white transition-all hover:shadow-lg"
+              style={{ backgroundColor: storeData.accentColor }}
+            >
+              Send Message
+            </button>
+          </form>
+
+          <div className="mt-12 pt-12 border-t border-gray-300">
+            <h3 className="text-2xl font-bold mb-6">Other Ways to Reach Us</h3>
+            <div className="space-y-4 text-gray-700">
+              <p>
+                <strong>Email:</strong> {storeData.contactEmail}
+              </p>
+              <p>
+                <strong>Hours:</strong> Monday - Friday, 9 AM - 5 PM EST
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    </div>
+  );
+
+  // Shopping Cart Page
+  const CartPage = () => {
+    const cartProducts = cartItems
+      .map((item) => ({
+        ...storeData.products.find((p) => p.id === item.id),
+        quantity: item.quantity,
+      }))
+      .filter((p) => p) as (Product & { quantity: number })[];
+
+    const total = cartProducts.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+    return (
+      <div className="py-16">
+        <div className="max-w-6xl mx-auto px-6">
+          <button
+            onClick={() => setCurrentPage('shop')}
+            className="mb-8 flex items-center gap-2 px-4 py-2 text-gray-700 hover:text-gray-900"
+          >
+            <ArrowLeft size={20} />
+            Continue Shopping
+          </button>
+
+          <h1 className="text-5xl font-bold mb-12">Shopping Cart</h1>
+
+          {cartProducts.length === 0 ? (
+            <div className="text-center py-16">
+              <ShoppingCart size={64} className="mx-auto text-gray-400 mb-4" />
+              <p className="text-2xl text-gray-600 mb-8">Your cart is empty</p>
+              <button
+                onClick={() => setCurrentPage('shop')}
+                className="px-6 py-3 rounded font-semibold text-white"
+                style={{ backgroundColor: storeData.accentColor }}
+              >
+                Start Shopping
+              </button>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-3 gap-8">
+              {/* Cart Items */}
+              <div className="md:col-span-2">
+                <div className="space-y-4">
+                  {cartProducts.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex gap-6 p-6 border border-gray-200 rounded-lg"
+                    >
+                      <img
+                        src={item.image}
+                        alt={item.name}
+                        className="w-24 h-24 object-cover rounded"
+                      />
+                      <div className="flex-1">
+                        <h3 className="text-lg font-bold">{item.name}</h3>
+                        <p className="text-gray-600">${item.price.toFixed(2)}</p>
+                        <div className="flex items-center gap-4 mt-4">
+                          <span className="text-sm text-gray-600">Qty: {item.quantity}</span>
+                          <button
+                            onClick={() => removeFromCart(item.id)}
+                            className="text-red-500 hover:text-red-700 text-sm font-semibold"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xl font-bold">
+                          ${(item.price * item.quantity).toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Order Summary */}
+              <div className="bg-gray-50 p-6 rounded-lg h-fit">
+                <h3 className="text-xl font-bold mb-6">Order Summary</h3>
+                <div className="space-y-4 mb-6">
+                  <div className="flex justify-between">
+                    <span>Subtotal</span>
+                    <span>${total.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Shipping</span>
+                    <span>$10.00</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Tax</span>
+                    <span>${(total * 0.1).toFixed(2)}</span>
+                  </div>
+                </div>
+                <div
+                  className="border-t border-gray-300 pt-4 mb-6 flex justify-between text-xl font-bold"
+                  style={{ borderColor: storeData.accentColor }}
+                >
+                  <span>Total</span>
+                  <span>${(total + 10 + total * 0.1).toFixed(2)}</span>
+                </div>
+                <button
+                  onClick={() => setCurrentPage('checkout')}
+                  className="w-full px-6 py-3 rounded font-semibold text-white transition-all hover:shadow-lg"
+                  style={{ backgroundColor: storeData.accentColor }}
+                >
+                  Proceed to Checkout
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Checkout Page
+  const CheckoutPage = () => {
+    const cartProducts = cartItems
+      .map((item) => ({
+        ...storeData.products.find((p) => p.id === item.id),
+        quantity: item.quantity,
+      }))
+      .filter((p) => p) as (Product & { quantity: number })[];
+    const total = cartProducts.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+    return (
+      <div className="py-16 bg-gray-50">
+        <div className="max-w-4xl mx-auto px-6">
+          <button
+            onClick={() => setCurrentPage('cart')}
+            className="mb-8 flex items-center gap-2 px-4 py-2 text-gray-700 hover:text-gray-900"
+          >
+            <ArrowLeft size={20} />
+            Back to Cart
+          </button>
+
+          <h1 className="text-5xl font-bold mb-12">Checkout</h1>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {/* Checkout Form */}
+            <div className="md:col-span-2 bg-white p-8 rounded-lg">
+              <h2 className="text-2xl font-bold mb-6">Shipping Information</h2>
+              <form className="space-y-6">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <input
+                    type="text"
+                    placeholder="First Name"
+                    className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
+                    style={{ '--tw-ring-color': storeData.accentColor } as any}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Last Name"
+                    className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
+                    style={{ '--tw-ring-color': storeData.accentColor } as any}
+                  />
+                </div>
+                <input
+                  type="email"
+                  placeholder="Email"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
+                  style={{ '--tw-ring-color': storeData.accentColor } as any}
+                />
+                <input
+                  type="text"
+                  placeholder="Address"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
+                  style={{ '--tw-ring-color': storeData.accentColor } as any}
+                />
+                <div className="grid md:grid-cols-3 gap-4">
+                  <input
+                    type="text"
+                    placeholder="City"
+                    className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
+                    style={{ '--tw-ring-color': storeData.accentColor } as any}
+                  />
+                  <input
+                    type="text"
+                    placeholder="State"
+                    className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
+                    style={{ '--tw-ring-color': storeData.accentColor } as any}
+                  />
+                  <input
+                    type="text"
+                    placeholder="ZIP Code"
+                    className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
+                    style={{ '--tw-ring-color': storeData.accentColor } as any}
+                  />
+                </div>
+
+                <h2 className="text-2xl font-bold mt-12 mb-6">Payment Information</h2>
+                <input
+                  type="text"
+                  placeholder="Cardholder Name"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
+                  style={{ '--tw-ring-color': storeData.accentColor } as any}
+                />
+                <input
+                  type="text"
+                  placeholder="Card Number"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
+                  style={{ '--tw-ring-color': storeData.accentColor } as any}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <input
+                    type="text"
+                    placeholder="MM/YY"
+                    className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
+                    style={{ '--tw-ring-color': storeData.accentColor } as any}
+                  />
+                  <input
+                    type="text"
+                    placeholder="CVV"
+                    className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
+                    style={{ '--tw-ring-color': storeData.accentColor } as any}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full px-6 py-4 rounded font-bold text-lg text-white transition-all hover:shadow-lg mt-8"
+                  style={{ backgroundColor: storeData.accentColor }}
+                >
+                  Place Order
+                </button>
+              </form>
+            </div>
+
+            {/* Order Summary */}
+            <div className="bg-white p-6 rounded-lg h-fit">
+              <h3 className="text-xl font-bold mb-6">Order Summary</h3>
+              <div className="space-y-4 mb-6 max-h-64 overflow-y-auto">
+                {cartProducts.map((item) => (
+                  <div key={item.id} className="flex justify-between text-sm">
+                    <span>{item.name} x{item.quantity}</span>
+                    <span>${(item.price * item.quantity).toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="space-y-2 pt-6 border-t border-gray-300">
+                <div className="flex justify-between">
+                  <span>Subtotal</span>
+                  <span>${total.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Shipping</span>
+                  <span>$10.00</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Tax</span>
+                  <span>${(total * 0.1).toFixed(2)}</span>
+                </div>
+                <div
+                  className="flex justify-between text-lg font-bold pt-4"
+                  style={{ borderTop: `2px solid ${storeData.accentColor}` }}
+                >
+                  <span>Total</span>
+                  <span>${(total + 10 + total * 0.1).toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Memoized Image Preview Component - prevents re-renders on slider changes
+  // Ultra-optimized Image Preview with direct DOM manipulation
+  const ImagePreview = React.memo(({ src, scale, offsetX, offsetY }: { src: string; scale: number; offsetX: number; offsetY: number }) => {
+    const imgRef = useRef<HTMLImageElement>(null);
+    
+    useEffect(() => {
+      if (imgRef.current) {
+        // Use direct DOM manipulation for instant visual feedback
+        imgRef.current.style.transform = `scale(${scale}) translate(${offsetX}px, ${offsetY}px)`;
+      }
+    }, [scale, offsetX, offsetY]);
+
+    return (
+      <div className="w-full bg-gray-100 rounded-lg overflow-hidden border border-gray-300">
+        <div className="relative w-full aspect-square flex items-center justify-center">
+          <img
+            ref={imgRef}
+            src={src}
+            alt="Preview"
+            className="w-full h-full object-cover"
+            style={{
+              transformOrigin: 'center',
+              willChange: 'transform',
+              transition: 'none', // No transition for immediate feedback
+            }}
+          />
+        </div>
+      </div>
+    );
+  });
+  ImagePreview.displayName = 'ImagePreview';
+
+  // Ultra-optimized Crop Controls with local state and debouncing
+  const CropControls = React.memo(({
+    scale,
+    offsetX,
+    offsetY,
+    onScaleChange,
+    onOffsetXChange,
+    onOffsetYChange,
+  }: {
+    scale: number;
+    offsetX: number;
+    offsetY: number;
+    onScaleChange: (value: number) => void;
+    onOffsetXChange: (value: number) => void;
+    onOffsetYChange: (value: number) => void;
+  }) => {
+    const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const [localScale, setLocalScale] = useState(scale);
+    const [localOffsetX, setLocalOffsetX] = useState(offsetX);
+    const [localOffsetY, setLocalOffsetY] = useState(offsetY);
+
+    // Sync external state to local state
+    useEffect(() => {
+      setLocalScale(scale);
+    }, [scale]);
+
+    useEffect(() => {
+      setLocalOffsetX(offsetX);
+    }, [offsetX]);
+
+    useEffect(() => {
+      setLocalOffsetY(offsetY);
+    }, [offsetY]);
+
+    // Debounced handler for scale
+    const handleScaleChange = useCallback((newValue: number) => {
+      setLocalScale(newValue);
+      
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      
+      debounceTimerRef.current = setTimeout(() => {
+        onScaleChange(newValue);
+      }, 50); // 50ms debounce for smooth interaction
+    }, [onScaleChange]);
+
+    // Debounced handler for offset X
+    const handleOffsetXChange = useCallback((newValue: number) => {
+      setLocalOffsetX(newValue);
+      
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      
+      debounceTimerRef.current = setTimeout(() => {
+        onOffsetXChange(newValue);
+      }, 50);
+    }, [onOffsetXChange]);
+
+    // Debounced handler for offset Y
+    const handleOffsetYChange = useCallback((newValue: number) => {
+      setLocalOffsetY(newValue);
+      
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      
+      debounceTimerRef.current = setTimeout(() => {
+        onOffsetYChange(newValue);
+      }, 50);
+    }, [onOffsetYChange]);
+
+    // Cleanup debounce timer on unmount
+    useEffect(() => {
+      return () => {
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+        }
+      };
+    }, []);
+
+    return (
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-semibold mb-2">
+            Zoom Level: {(localScale * 100).toFixed(0)}%
+          </label>
+          <input
+            type="range"
+            min="1"
+            max="3"
+            step="0.05"
+            value={localScale}
+            onChange={(e) => handleScaleChange(parseFloat(e.target.value))}
+            className="w-full cursor-pointer accent-blue-600"
+            style={{ cursor: 'pointer' }}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold mb-2">
+            Horizontal Position: {localOffsetX}px
+          </label>
+          <input
+            type="range"
+            min="-100"
+            max="100"
+            step="1"
+            value={localOffsetX}
+            onChange={(e) => handleOffsetXChange(parseInt(e.target.value))}
+            className="w-full cursor-pointer accent-blue-600"
+            style={{ cursor: 'pointer' }}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold mb-2">
+            Vertical Position: {localOffsetY}px
+          </label>
+          <input
+            type="range"
+            min="-100"
+            max="100"
+            step="1"
+            value={localOffsetY}
+            onChange={(e) => handleOffsetYChange(parseInt(e.target.value))}
+            className="w-full cursor-pointer accent-blue-600"
+            style={{ cursor: 'pointer' }}
+          />
+        </div>
+      </div>
+    );
+  });
+  CropControls.displayName = 'CropControls';
+
+  // Image Upload and Crop Modal
+  const ImageUploadModal = () => {
+    if (!showImageUploadModal) return null;
+
+    // Use callbacks to prevent re-rendering the entire modal on slider changes
+    const handleCropScaleChange = useCallback((value: number) => {
+      setCropScale(value);
+    }, []);
+
+    const handleCropOffsetXChange = useCallback((value: number) => {
+      setCropOffsetX(value);
+    }, []);
+
+    const handleCropOffsetYChange = useCallback((value: number) => {
+      setCropOffsetY(value);
+    }, []);
+
+    return (
+      <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
+        <motion.div
+          className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+        >
+          <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
+            <h2 className="text-2xl font-bold">Upload Product Image</h2>
+            <button
+              onClick={() => {
+                setShowImageUploadModal(false);
+                setUploadedImage(null);
+                setCropScale(1);
+                setCropOffsetX(0);
+                setCropOffsetY(0);
+              }}
+              className="p-2 hover:bg-gray-100 rounded-lg"
+            >
+              <X size={24} />
+            </button>
+          </div>
+
+          <div className="p-6 space-y-6">
+            {/* Mode Toggle */}
+            <div className="flex gap-4 border-b pb-4">
+              <button
+                onClick={() => {
+                  setImageUploadMode('upload');
+                  setUploadedImage(null);
+                }}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                  imageUploadMode === 'upload'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <Upload size={18} className="inline mr-2" />
+                Upload from Computer
+              </button>
+              <button
+                onClick={() => setImageUploadMode('url')}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                  imageUploadMode === 'url'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Use Image URL
+              </button>
+            </div>
+
+            {/* Upload from Computer */}
+            {imageUploadMode === 'upload' ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold mb-3">
+                    Select Image (Recommended: 1:1 aspect ratio for products)
+                  </label>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            setUploadedImage(event.target?.result as string);
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="hidden"
+                      id="imageUpload"
+                    />
+                    <label htmlFor="imageUpload" className="cursor-pointer">
+                      <Upload size={32} className="mx-auto text-gray-400 mb-2" />
+                      <p className="text-gray-700 font-semibold mb-1">Click to upload</p>
+                      <p className="text-sm text-gray-500">or drag and drop</p>
+                      <p className="text-xs text-gray-400 mt-2">PNG, JPG up to 10MB</p>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Image Preview and Crop */}
+                {uploadedImage && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-semibold mb-2">Preview</label>
+                      <ImagePreview src={uploadedImage} scale={cropScale} offsetX={cropOffsetX} offsetY={cropOffsetY} />
+                    </div>
+
+                    {/* Crop Controls */}
+                    <CropControls
+                      scale={cropScale}
+                      offsetX={cropOffsetX}
+                      offsetY={cropOffsetY}
+                      onScaleChange={handleCropScaleChange}
+                      onOffsetXChange={handleCropOffsetXChange}
+                      onOffsetYChange={handleCropOffsetYChange}
+                    />
+
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <p className="text-sm text-blue-800">
+                        <strong>Aspect Ratio:</strong> 1:1 (Square) is recommended for product images. The image will display at 500x500px in the store.
+                      </p>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => {
+                          if (editingProduct) {
+                            setEditingProduct({
+                              ...editingProduct,
+                              image: uploadedImage,
+                            });
+                          }
+                          setShowImageUploadModal(false);
+                          setUploadedImage(null);
+                          setCropScale(1);
+                          setCropOffsetX(0);
+                          setCropOffsetY(0);
+                        }}
+                        className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                      >
+                        Use This Image
+                      </button>
+                      <button
+                        onClick={() => {
+                          setUploadedImage(null);
+                          setCropScale(1);
+                          setCropOffsetX(0);
+                          setCropOffsetY(0);
+                        }}
+                        className="flex-1 px-4 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* URL Input Mode */
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Image URL</label>
+                  <input
+                    type="url"
+                    placeholder="https://example.com/image.jpg"
+                    defaultValue={editingProduct?.image || ''}
+                    onChange={(e) => {
+                      if (editingProduct) {
+                        setEditingProduct({
+                          ...editingProduct,
+                          image: e.target.value,
+                        });
+                      }
+                    }}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {editingProduct?.image && (
+                  <div>
+                    <label className="block text-sm font-semibold mb-2">Preview</label>
+                    <div className="w-full bg-gray-100 rounded-lg overflow-hidden border border-gray-300">
+                      <div className="relative w-full aspect-square">
+                        <img
+                          src={editingProduct.image}
+                          alt="Preview"
+                          className="w-full h-full object-cover"
+                          onError={() => {
+                            alert('Unable to load image from URL');
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-blue-800">
+                    <strong>Aspect Ratio:</strong> 1:1 (Square) is recommended for product images. The image will display at 500x500px in the store.
+                  </p>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setShowImageUploadModal(false);
+                      setImageUploadMode('upload');
+                    }}
+                    className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      </div>
+    );
+  };
+
+  // Product Edit Modal
+  const ProductEditModal = () => {
+    if (!editingProduct || !showProductModal) return null;
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backdropFilter: 'blur(4px)', backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
+        <motion.div
+          className="bg-white rounded-lg max-w-2xl w-full max-h-96 overflow-y-auto shadow-2xl"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+        >
+          <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
+            <h2 className="text-2xl font-bold">Edit Product</h2>
+            <button
+              onClick={() => {
+                setShowProductModal(false);
+                setEditingProduct(null);
+              }}
+              className="p-2 hover:bg-gray-100 rounded-lg"
+            >
+              <X size={24} />
+            </button>
+          </div>
+
+          <div className="p-6 space-y-4">
+            <div>
+              <label className="block text-sm font-semibold mb-2">Product Name</label>
+              <input
+                type="text"
+                value={editingProduct.name}
+                onChange={(e) =>
+                  setEditingProduct({ ...editingProduct, name: e.target.value })
+                }
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold mb-2">Description</label>
+              <textarea
+                value={editingProduct.description}
+                onChange={(e) =>
+                  setEditingProduct({ ...editingProduct, description: e.target.value })
+                }
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                rows={3}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold mb-2">Price</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={editingProduct.price}
+                  onChange={(e) =>
+                    setEditingProduct({ ...editingProduct, price: parseFloat(e.target.value) })
+                  }
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold mb-2">Category</label>
+                <select
+                  value={editingProduct.category}
+                  onChange={(e) =>
+                    setEditingProduct({ ...editingProduct, category: e.target.value })
+                  }
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                >
+                  {storeData.categories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold mb-3">Product Image</label>
+              <div className="space-y-3">
+                {/* Current Image Preview */}
+                {editingProduct.image && (
+                  <div className="w-full bg-gray-100 rounded-lg overflow-hidden border border-gray-300">
+                    <div className="relative w-full aspect-square">
+                      <img
+                        src={editingProduct.image}
+                        alt="Product"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Image URL Input */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Image URL</label>
+                  <input
+                    type="text"
+                    value={editingProduct.image}
+                    onChange={(e) =>
+                      setEditingProduct({ ...editingProduct, image: e.target.value })
+                    }
+                    placeholder="https://example.com/image.jpg"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm"
+                  />
+                </div>
+
+                {/* Upload Button */}
+                <button
+                  onClick={() => setShowImageUploadModal(true)}
+                  className="w-full px-4 py-2 border-2 border-dashed border-blue-400 text-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Upload size={18} />
+                  Or Upload from Computer
+                </button>
+
+                <p className="text-xs text-gray-500 text-center">
+                  Recommended: 1:1 aspect ratio (square) • 500x500px
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <button
+                onClick={() => updateProduct(editingProduct)}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700"
+              >
+                Save Changes
+              </button>
+              <button
+                onClick={() => {
+                  setShowProductModal(false);
+                  setEditingProduct(null);
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    );
+  };
+
+  // Hero Image Upload Modal
+  const HeroImageUploadModal = () => {
+    if (!showHeroImageUploadModal) return null;
+
+    const handleHeroImageUpload = useCallback((value: number) => {
+      // Placeholder for future crop functionality
+    }, []);
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backdropFilter: 'blur(4px)', backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
+        <motion.div
+          className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+        >
+          <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
+            <h2 className="text-2xl font-bold">Upload Hero Image</h2>
+            <button
+              onClick={() => {
+                setShowHeroImageUploadModal(false);
+                setHeroUploadedImage(null);
+              }}
+              className="p-2 hover:bg-gray-100 rounded-lg"
+            >
+              <X size={24} />
+            </button>
+          </div>
+
+          <div className="p-6 space-y-6">
+            {/* Upload from Computer */}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold mb-3">
+                  Select Hero Image (Recommended: 1200x600px)
+                </label>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                          setHeroUploadedImage(event.target?.result as string);
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="hidden"
+                    id="heroImageUpload"
+                  />
+                  <label htmlFor="heroImageUpload" className="cursor-pointer">
+                    <Upload size={32} className="mx-auto text-gray-400 mb-2" />
+                    <p className="text-gray-700 font-semibold mb-1">Click to upload</p>
+                    <p className="text-sm text-gray-500">or drag and drop</p>
+                    <p className="text-xs text-gray-400 mt-2">PNG, JPG up to 10MB</p>
+                  </label>
+                </div>
+              </div>
+
+              {/* Image Preview */}
+              {heroUploadedImage && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold mb-2">Preview</label>
+                    <div className="w-full bg-gray-100 rounded-lg overflow-hidden border border-gray-300">
+                      <div className="relative w-full h-64">
+                        <img
+                          src={heroUploadedImage}
+                          alt="Hero Preview"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p className="text-sm text-blue-800">
+                      <strong>Aspect Ratio:</strong> 2:1 (2 width to 1 height) is recommended for hero images. The image will display at 1200x600px on the store.
+                    </p>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => {
+                        updateStoreData({ heroImage: heroUploadedImage });
+                        setShowHeroImageUploadModal(false);
+                        setHeroUploadedImage(null);
+                      }}
+                      className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                    >
+                      Use This Image
+                    </button>
+                    <button
+                      onClick={() => {
+                        setHeroUploadedImage(null);
+                      }}
+                      className="flex-1 px-4 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    );
+  };
+
+  // Footer
+  const Footer = () => (
+    <div
+      className="border-t"
+      style={{ backgroundColor: storeData.secondaryColor, borderColor: '#e5e7eb' }}
+    >
+      <div className="max-w-7xl mx-auto px-6 py-16">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+          <div>
+            <h3 className="text-xl font-bold mb-4" style={{ color: storeData.accentColor }}>
+              {storeData.storeName}
+            </h3>
+            <p className="text-gray-600 text-sm leading-relaxed">
+              Curated goods for a simpler, more intentional life.
+            </p>
+          </div>
+          {[
+            { title: 'Explore', links: ['Shop All', 'New Arrivals', 'Best Sellers'] },
+            { title: 'Support', links: ['Contact Us', 'Shipping Info', 'Returns'] },
+            { title: 'Connect', links: ['Instagram', 'Facebook', 'Newsletter'] },
+          ].map((col) => (
+            <div key={col.title}>
+              <h4 className="font-bold text-gray-900 mb-4 text-sm uppercase tracking-widest">
+                {col.title}
+              </h4>
+              <ul className="space-y-3">
+                {col.links.map((link) => (
+                  <li key={link}>
+                    <a href="#" className="text-sm text-gray-600 hover:text-gray-900">
+                      {link}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+        <div className="border-t border-gray-300 pt-8 flex justify-between text-sm text-gray-600">
+          <p>© 2025 {storeData.storeName}. All rights reserved.</p>
+          <div className="flex gap-6">
+            <a href="#">Privacy Policy</a>
+            <a href="#">Terms of Service</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Render current page
+  const renderStorePage = () => {
+    switch (currentPage) {
+      case 'home':
+        return (
+          <>
+            <HeroSection />
+            <div className="mt-16">
+              <CategoryFilter />
+              <SearchFilterBar />
+              <ProductsSection />
+            </div>
+          </>
+        );
+      case 'shop':
+        return (
+          <>
+            <CategoryFilter />
+            <SearchFilterBar />
+            <ProductsSection />
+          </>
+        );
+      case 'product':
+        return <ProductDetailPage />;
+      case 'about':
+        return <AboutPage />;
+      case 'contact':
+        return <ContactPage />;
+      case 'cart':
+        return <CartPage />;
+      case 'checkout':
+        return <CheckoutPage />;
+      default:
+        return null;
+    }
+  };
+
+  // Preview Mode
   if (isPreviewMode) {
     return (
-      <div className="min-h-screen bg-(--onyx-white)">
-        {/* Preview Header */}
-        <div className="border-b border-(--onyx-grey-lighter) sticky top-0 z-40">
-          <div className="container-custom py-4 flex items-center justify-between">
-            <h2 className="text-2xl font-semibold text-(--onyx-stone)">
-              {storeName} - Preview
-            </h2>
+      <div className="min-h-screen" style={{ backgroundColor: storeData.primaryColor }}>
+        <Navbar />
+
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <div className="mb-8">
             <button
               onClick={() => setIsPreviewMode(false)}
-              className="btn-secondary flex items-center gap-2"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg font-semibold transition-colors"
             >
-              <ArrowLeft size={18} weight="bold" />
+              <ArrowLeft size={18} />
               Back to Editor
             </button>
           </div>
-        </div>
 
-        {/* Preview Canvas */}
-        <div className="container-custom py-12">
-          <div
-            className="bg-(--onyx-white) border border-(--onyx-grey-lighter) rounded-lg overflow-hidden"
-            style={{ minHeight: '600px' }}
-          >
-            {elements.map((element) => (
-              <div
-                key={element.id}
-                style={{
-                  position: 'absolute',
-                  left: `${element.x}px`,
-                  top: `${element.y}px`,
-                  width: `${element.width}px`,
-                  height: `${element.height}px`,
-                  backgroundColor: element.backgroundColor,
-                  color: element.color || 'black',
-                  fontSize: element.fontSize ? `${element.fontSize}px` : undefined,
-                  padding: '10px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  border: `2px solid ${element.type === 'button' ? '#353935' : 'transparent'}`,
-                  borderRadius: element.type === 'button' ? '8px' : '0px',
-                }}
-              >
-                {element.content}
-              </div>
-            ))}
+          {renderStorePage()}
+          <div className="mt-16">
+            <Footer />
           </div>
         </div>
       </div>
     );
   }
 
+  // Editor Mode
   return (
-    <div className="min-h-screen bg-(--onyx-white) flex flex-col">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="border-b border-(--onyx-grey-lighter) sticky top-0 z-40 bg-(--onyx-white)"
-      >
-        <div className="container-custom py-4">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Editor Header */}
+      <div className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+        <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
                 onClick={() => router.back()}
-                className="p-2 hover:bg-(--onyx-grey-lighter) rounded-lg transition-colors"
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                <ArrowLeft size={20} weight="bold" className="text-(--onyx-stone)" />
+                <ArrowLeft size={20} weight="bold" />
               </button>
               <div>
-                <h1 className="text-2xl font-bold text-(--onyx-stone)">{storeName}</h1>
-                <p className="text-xs text-(--onyx-grey)">Template: {template}</p>
+                <h1 className="text-2xl font-bold text-gray-900">Store Editor</h1>
+                <p className="text-sm text-gray-500">{storeName}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setIsPreviewMode(true)}
-                className="btn-secondary flex items-center gap-2 text-sm"
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg font-semibold transition-colors"
               >
                 <Eye size={18} weight="bold" />
                 Preview
               </button>
               <button
-                onClick={handleSave}
-                className="btn-primary flex items-center gap-2 text-sm"
+                onClick={() => {
+                  alert('Store saved successfully!');
+                  router.push('/dashboard/stores');
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg font-semibold transition-colors"
               >
                 <FloppyDisk size={18} weight="bold" />
-                Save & Continue
+                Save & Publish
               </button>
             </div>
           </div>
         </div>
-      </motion.div>
+      </div>
 
-      <div className="flex-1 flex">
-        {/* Toolbar */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="w-64 border-r border-(--onyx-grey-lighter) p-6 overflow-y-auto bg-(--onyx-grey-lighter)/20"
-        >
-          <h3 className="text-lg font-semibold text-(--onyx-stone) mb-4">Add Elements</h3>
-          <div className="space-y-3 mb-8">
-            <button
-              onClick={() => addElement('text')}
-              className="w-full flex items-center gap-3 px-4 py-3 bg-(--onyx-white) border border-(--onyx-grey-lighter) rounded-lg hover:bg-(--onyx-grey-lighter) transition-colors text-left"
-            >
-              <TextT size={18} weight="bold" className="text-(--onyx-stone)" />
-              <span className="text-sm font-medium">Add Text</span>
-            </button>
-            <button
-              onClick={() => addElement('image')}
-              className="w-full flex items-center gap-3 px-4 py-3 bg-(--onyx-white) border border-(--onyx-grey-lighter) rounded-lg hover:bg-(--onyx-grey-lighter) transition-colors text-left"
-            >
-              <Image size={18} weight="bold" className="text-(--onyx-stone)" />
-              <span className="text-sm font-medium">Add Image</span>
-            </button>
-            <button
-              onClick={() => addElement('button')}
-              className="w-full flex items-center gap-3 px-4 py-3 bg-(--onyx-white) border border-(--onyx-grey-lighter) rounded-lg hover:bg-(--onyx-grey-lighter) transition-colors text-left"
-            >
-              <Square size={18} weight="bold" className="text-(--onyx-stone)" />
-              <span className="text-sm font-medium">Add Button</span>
-            </button>
-            <button
-              onClick={() => addElement('container')}
-              className="w-full flex items-center gap-3 px-4 py-3 bg-(--onyx-white) border border-(--onyx-grey-lighter) rounded-lg hover:bg-(--onyx-grey-lighter) transition-colors text-left"
-            >
-              <Folder size={18} weight="bold" className="text-(--onyx-stone)" />
-              <span className="text-sm font-medium">Add Container</span>
-            </button>
+      <div className="flex-1 overflow-hidden flex gap-6 p-6">
+        {/* Left Sidebar - Settings */}
+        <div className="w-80 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="font-bold text-gray-900">Store Settings</h3>
           </div>
 
-          {/* Element Properties */}
-          {selectedElement && (
-            <div className="bg-(--onyx-white) p-4 rounded-lg border border-(--onyx-grey-lighter)">
-              <h4 className="font-semibold text-(--onyx-stone) mb-4">Properties</h4>
-              <div className="space-y-4">
-                {selectedElement.type === 'text' && (
-                  <>
-                    <div>
-                      <label className="block text-xs font-medium text-(--onyx-stone) mb-2">
-                        Text
-                      </label>
-                      <input
-                        type="text"
-                        value={selectedElement.content || ''}
-                        onChange={(e) =>
-                          updateElement(selectedElement.id, { content: e.target.value })
-                        }
-                        className="input-field text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-(--onyx-stone) mb-2">
-                        Font Size
-                      </label>
-                      <input
-                        type="number"
-                        value={selectedElement.fontSize || 16}
-                        onChange={(e) =>
-                          updateElement(selectedElement.id, { fontSize: parseInt(e.target.value) })
-                        }
-                        className="input-field text-sm"
-                      />
-                    </div>
-                  </>
-                )}
-                <div>
-                  <label className="block text-xs font-medium text-(--onyx-stone) mb-2">
-                    Width
-                  </label>
-                  <input
-                    type="number"
-                    value={selectedElement.width}
-                    onChange={(e) =>
-                      updateElement(selectedElement.id, { width: parseInt(e.target.value) })
-                    }
-                    className="input-field text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-(--onyx-stone) mb-2">
-                    Height
-                  </label>
-                  <input
-                    type="number"
-                    value={selectedElement.height}
-                    onChange={(e) =>
-                      updateElement(selectedElement.id, { height: parseInt(e.target.value) })
-                    }
-                    className="input-field text-sm"
-                  />
-                </div>
+          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">Store Name</label>
+              <input
+                type="text"
+                value={storeData.storeName}
+                onChange={(e) => updateStoreData({ storeName: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">Hero Title</label>
+              <textarea
+                value={storeData.heroTitle}
+                onChange={(e) => updateStoreData({ heroTitle: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                rows={2}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">Hero Subtitle</label>
+              <textarea
+                value={storeData.heroSubtitle}
+                onChange={(e) => updateStoreData({ heroSubtitle: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                rows={2}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">Hero Image URL</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={storeData.heroImage}
+                  onChange={(e) => updateStoreData({ heroImage: e.target.value })}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="https://..."
+                />
                 <button
-                  onClick={() => deleteElement(selectedElement.id)}
-                  className="w-full btn-secondary text-xs flex items-center justify-center gap-2"
+                  onClick={() => {
+                    setShowHeroImageUploadModal(true);
+                    setIsHeroImageUpload(true);
+                  }}
+                  className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2"
                 >
-                  <Trash size={16} weight="bold" />
-                  Delete
+                  <Upload size={16} />
+                  Upload
                 </button>
               </div>
             </div>
-          )}
-        </motion.div>
 
-        {/* Canvas Area */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="flex-1 p-6 overflow-auto"
-        >
-          <div className="mx-auto max-w-6xl">
-            <h3 className="text-lg font-semibold text-(--onyx-stone) mb-4">Canvas</h3>
-            <div
-              ref={canvasRef}
-              className="relative bg-(--onyx-white) border-2 border-dashed border-(--onyx-grey-lighter) rounded-lg"
-              style={{ minHeight: '800px' }}
-            >
-              {elements.map((element) => (
-                <motion.div
-                  key={element.id}
-                  onClick={() => setSelectedId(element.id)}
-                  className={`absolute cursor-move p-2 rounded transition-all ${
-                    selectedId === element.id
-                      ? 'ring-2 ring-(--onyx-stone) bg-(--onyx-grey-lighter)/20'
-                      : 'hover:ring-1 hover:ring-(--onyx-grey-light)'
-                  }`}
-                  drag
-                  dragMomentum={false}
-                  dragElastic={0}
-                  onDragEnd={(e, info) => {
-                    updateElement(element.id, {
-                      x: Math.round(element.x + info.offset.x),
-                      y: Math.round(element.y + info.offset.y),
-                    });
-                  }}
-                  style={{
-                    left: element.x,
-                    top: element.y,
-                    width: element.width,
-                    height: element.height,
-                    backgroundColor: element.backgroundColor,
-                    color: element.color || 'black',
-                    fontSize: element.fontSize ? `${element.fontSize}px` : undefined,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    border:
-                      element.type === 'button'
-                        ? `2px solid var(--onyx-stone)`
-                        : '2px solid transparent',
-                    borderRadius: element.type === 'button' ? '8px' : '0px',
-                  }}
-                >
-                  {element.content || `[${element.type}]`}
-                </motion.div>
-              ))}
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">About Text</label>
+              <textarea
+                value={storeData.aboutText}
+                onChange={(e) => updateStoreData({ aboutText: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                rows={2}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">Contact Email</label>
+              <input
+                type="email"
+                value={storeData.contactEmail}
+                onChange={(e) => updateStoreData({ contactEmail: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-3">Colors</label>
+              <div className="space-y-3">
+                {[
+                  { label: 'Primary Color', key: 'primaryColor' as const },
+                  { label: 'Secondary Color', key: 'secondaryColor' as const },
+                  { label: 'Accent Color', key: 'accentColor' as const },
+                ].map((color) => (
+                  <div key={color.key}>
+                    <label className="text-xs text-gray-600 mb-1 block">{color.label}</label>
+                    <input
+                      type="color"
+                      value={storeData[color.key]}
+                      onChange={(e) => updateStoreData({ [color.key]: e.target.value })}
+                      className="w-full h-10 rounded cursor-pointer"
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </motion.div>
+        </div>
+
+        {/* Center - Preview */}
+        <div className="flex-1 overflow-auto bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="min-h-full" style={{ backgroundColor: storeData.primaryColor }}>
+            <Navbar />
+            <div className="max-w-7xl mx-auto px-6 py-8">
+              {renderStorePage()}
+              <div className="mt-16">
+                <Footer />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Sidebar - Products Manager */}
+        <div className="w-80 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <h3 className="font-bold text-gray-900">Products ({storeData.products.length})</h3>
+            <button
+              onClick={addNewProduct}
+              className="p-2 hover:bg-gray-100 rounded-lg text-blue-600"
+              title="Add new product"
+            >
+              <Plus size={20} weight="bold" />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {storeData.products.map((product) => (
+              <motion.div
+                key={product.id}
+                className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors group"
+                whileHover={{ scale: 1.02 }}
+              >
+                <div className="flex gap-3 items-start">
+                  <img
+                    src={product.image}
+                    alt={product.name}
+                    className="w-12 h-12 rounded object-cover shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm font-semibold text-gray-900 truncate">
+                      {product.name}
+                    </h4>
+                    <p className="text-xs text-gray-500">${product.price.toFixed(2)}</p>
+                    <span className="text-xs text-gray-600">{product.category}</span>
+                  </div>
+                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => {
+                        setEditingProduct(product);
+                        setShowProductModal(true);
+                      }}
+                      className="p-1 hover:bg-blue-100 text-blue-600 rounded"
+                      title="Edit"
+                    >
+                      <PencilSimple size={16} weight="bold" />
+                    </button>
+                    <button
+                      onClick={() => deleteProduct(product.id)}
+                      className="p-1 hover:bg-red-100 text-red-600 rounded"
+                      title="Delete"
+                    >
+                      <Trash size={16} />
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
       </div>
+
+      <ProductEditModal />
+      <ImageUploadModal />
+      <HeroImageUploadModal />
     </div>
   );
 }
