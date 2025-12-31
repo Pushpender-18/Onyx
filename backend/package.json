@@ -5,7 +5,7 @@
   "scripts": {
     "compile": "hardhat compile",
     "test": "hardhat test solidity",
-    "deploy": "pnpm run test && hardhat ignition deploy ignition/modules/Counter.ts --network localhost"
+    "deploy": "pnpm run test && hardhat ignition deploy ignition/modules/Master.ts --network localhost"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ignition": "^3.0.6",

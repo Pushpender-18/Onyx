@@ -1,0 +1,147 @@
+{
+  "_format": "hh3-artifact-1",
+  "contractName": "Master",
+  "sourceName": "contracts/Master.sol",
+  "abi": [
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "shopAddress",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "name",
+          "type": "string"
+        }
+      ],
+      "name": "ShopCreated",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "allShops",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "_name",
+          "type": "string"
+        }
+      ],
+      "name": "createShop",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "_name",
+          "type": "string"
+        }
+      ],
+      "name": "getShopByName",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_owner",
+          "type": "address"
+        }
+      ],
+      "name": "getShopsByOwner",
+      "outputs": [
+        {
+          "internalType": "address[]",
+          "name": "",
+          "type": "address[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "shopOwnerRegistry",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x608060405234801561000f575f80fd5b5061025e8061001d5f395ff3fe608060405234801561000f575f80fd5b5060043610610060575f3560e01c806371926369146100645780638da5cb5b146100a957806396195dca146100bb578063d7117ee0146100ce578063e0eb33e1146100ef578063e674d1f6146100ef575b5f80fd5b61008c61007236600461012c565b60026020525f90815260409020546001600160a01b031681565b6040516001600160a01b0390911681526020015b60405180910390f35b5f5461008c906001600160a01b031681565b61008c6100c9366004610159565b610104565b6100e26100dc36600461012c565b50606090565b6040516100a09190610170565b61008c6100fd3660046101bc565b5f92915050565b60018181548110610113575f80fd5b5f918252602090912001546001600160a01b0316905081565b5f6020828403121561013c575f80fd5b81356001600160a01b0381168114610152575f80fd5b9392505050565b5f60208284031215610169575f80fd5b5035919050565b602080825282518282018190525f9190848201906040850190845b818110156101b05783516001600160a01b03168352928401929184019160010161018b565b50909695505050505050565b5f80602083850312156101cd575f80fd5b823567ffffffffffffffff808211156101e4575f80fd5b818501915085601f8301126101f7575f80fd5b813581811115610205575f80fd5b866020828501011115610216575f80fd5b6020929092019691955090935050505056fea26469706673582212202a37e36ed3bc37d2be9f40ec9b12391b97d4973671e5530887d838158478d22c64736f6c63430008170033",
+  "deployedBytecode": "0x608060405234801561000f575f80fd5b5060043610610060575f3560e01c806371926369146100645780638da5cb5b146100a957806396195dca146100bb578063d7117ee0146100ce578063e0eb33e1146100ef578063e674d1f6146100ef575b5f80fd5b61008c61007236600461012c565b60026020525f90815260409020546001600160a01b031681565b6040516001600160a01b0390911681526020015b60405180910390f35b5f5461008c906001600160a01b031681565b61008c6100c9366004610159565b610104565b6100e26100dc36600461012c565b50606090565b6040516100a09190610170565b61008c6100fd3660046101bc565b5f92915050565b60018181548110610113575f80fd5b5f918252602090912001546001600160a01b0316905081565b5f6020828403121561013c575f80fd5b81356001600160a01b0381168114610152575f80fd5b9392505050565b5f60208284031215610169575f80fd5b5035919050565b602080825282518282018190525f9190848201906040850190845b818110156101b05783516001600160a01b03168352928401929184019160010161018b565b50909695505050505050565b5f80602083850312156101cd575f80fd5b823567ffffffffffffffff808211156101e4575f80fd5b818501915085601f8301126101f7575f80fd5b813581811115610205575f80fd5b866020828501011115610216575f80fd5b6020929092019691955090935050505056fea26469706673582212202a37e36ed3bc37d2be9f40ec9b12391b97d4973671e5530887d838158478d22c64736f6c63430008170033",
+  "linkReferences": {},
+  "deployedLinkReferences": {},
+  "immutableReferences": {},
+  "inputSourceName": "project/contracts/Master.sol",
+  "buildInfoId": "solc-0_8_23-7e218290db2e57a90a2034f0b02ea229509a59fd"
+}

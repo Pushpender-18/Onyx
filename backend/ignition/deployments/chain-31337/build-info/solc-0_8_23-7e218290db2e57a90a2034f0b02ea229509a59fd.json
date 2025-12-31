@@ -1,0 +1,39 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_23-7e218290db2e57a90a2034f0b02ea229509a59fd",
+  "solcVersion": "0.8.23",
+  "solcLongVersion": "0.8.23+commit.f704f362",
+  "userSourceNameMap": {
+    "contracts/Master.sol": "project/contracts/Master.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "shanghai",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode",
+            "evm.deployedBytecode",
+            "evm.methodIdentifiers",
+            "metadata"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/Master.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.23;\n\ncontract Master {\n\taddress public owner;\n\taddress[] public allShops;\n\tmapping(address => address) public shopOwnerRegistry;\n\n\tevent ShopCreated(address indexed owner, address shopAddress, string name);\n\n\tfunction createShop(string calldata _name ) external returns (address) {\n\t\t// Deploys a new Shop contract and registers it.\n\t}\n\n\tfunction getShopByName(string calldata _name) external view returns (address) {\n\t\t// Retrieves the shop address associated with a specific name.\n\t}\n\n\tfunction getShopsByOwner(address _owner) external view returns (address[] memory) {\n\t\t// Retrieves the shop address associated with a specific user.\n\t}\n }"
+      }
+    }
+  }
+}
