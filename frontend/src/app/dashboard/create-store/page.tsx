@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Check } from 'phosphor-react';
+import { addItemToShop, createShop, getAllShops, getItemsFromShop, getShopDetails } from '@/lib/shop_interaction';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -88,6 +89,13 @@ export default function CreateStore() {
       name: storeName,
       description: storeDescription,
     });
+
+    // const result = await createShop(storeName, selectedTemplate, "none", "none");
+    // const result = await getAllShops();
+    // const result = await getShopDetails("Test");
+    // const result = await addItemToShop(undefined, "Item 2", 500, 50);
+    const result = await getItemsFromShop();
+    console.log('Shop:', result);
 
     // Redirect to editor
     router.push(`/dashboard/editor?template=${selectedTemplate}&storeName=${storeName}`);

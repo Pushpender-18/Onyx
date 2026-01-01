@@ -10,8 +10,10 @@ contract Master {
 
     event ShopCreated(address indexed owner, address shopAddress, string name);
 
-    function createShop(string calldata _name) external returns (address) {
-        Shop newShop = new Shop(_name, msg.sender);
+    function createShop(string calldata _name, string calldata _shopType,
+                        string calldata _description,string calldata _configuration,
+                        string calldata _thumbnailIpfsHash) external returns (address) {
+        Shop newShop = new Shop(_name, _shopType, _description, _configuration, _thumbnailIpfsHash, msg.sender);
         address shopAddress = address(newShop);
         allShopNames.push(_name);
         allShopAddresses.push(shopAddress);
