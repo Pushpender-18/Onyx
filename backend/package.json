@@ -5,6 +5,7 @@
   "scripts": {
     "compile": "hardhat compile",
     "test": "hardhat test solidity",
+    "node": "hardhat node",
     "deploy": "pnpm run test && hardhat ignition deploy ignition/modules/Master.ts --network localhost"
   },
   "devDependencies": {
