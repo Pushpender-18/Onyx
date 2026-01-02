@@ -32,7 +32,6 @@ export default function Navigation() {
   };
 
   const isDashboard = pathname.startsWith('/dashboard');
-  const isMarketplace = pathname.startsWith('/marketplace');
 
   return (
     <nav className="sticky top-0 z-50 bg-(--onyx-white) border-b border-(--onyx-grey-lighter)">
@@ -55,16 +54,6 @@ export default function Navigation() {
           <div className="hidden md:flex items-center gap-8">
             {isAuthenticated && (
               <>
-                <Link
-                  href="/marketplace"
-                  className={`text-sm font-medium transition-colors duration-200 ${
-                    pathname === '/marketplace'
-                      ? 'text-(--onyx-stone)'
-                      : 'text-(--onyx-grey) hover:text-(--onyx-stone)'
-                  }`}
-                >
-                  Marketplace
-                </Link>
                 <Link
                   href="/dashboard"
                   className={`text-sm font-medium transition-colors duration-200 ${
@@ -158,13 +147,6 @@ export default function Navigation() {
           <div className="px-4 py-4 space-y-3 border-t border-(--onyx-grey-lighter)">
             {isAuthenticated && (
               <>
-                <Link
-                  href="/marketplace"
-                  className="block px-4 py-2 text-(--onyx-grey) hover:bg-(--onyx-grey-lighter) rounded-lg transition-colors"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Marketplace
-                </Link>
                 <Link
                   href="/dashboard"
                   className="block px-4 py-2 text-(--onyx-grey) hover:bg-(--onyx-grey-lighter) rounded-lg transition-colors"

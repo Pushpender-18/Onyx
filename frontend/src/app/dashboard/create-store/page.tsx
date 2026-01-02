@@ -42,13 +42,6 @@ const TEMPLATES = [
     icon: FiTarget,
   },
   {
-    id: 'marketplace',
-    name: 'Marketplace',
-    description: 'Multi-vendor marketplace',
-    features: ['Vendor management', 'Category filtering', 'Advanced search'],
-    icon: FiShoppingCart,
-  },
-  {
     id: 'tech',
     name: 'Tech Store',
     description: 'Technology and gadgets focused',

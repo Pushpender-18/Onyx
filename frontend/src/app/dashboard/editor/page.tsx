@@ -21,6 +21,7 @@ import {
   Question,
   EnvelopeSimple,
 } from 'phosphor-react';
+import { TEMPLATES, DEFAULT_TEMPLATE, type TemplateConfig } from '../templateConfig';
 
 interface Product {
   id: string;
@@ -29,6 +30,7 @@ interface Product {
   image: string;
   category: string;
   description: string;
+  badge?: string;
 }
 
 interface StoreData {
@@ -41,6 +43,7 @@ interface StoreData {
   primaryColor: string;
   secondaryColor: string;
   accentColor: string;
+  textColor?: string;
   aboutText: string;
   contactEmail: string;
 }
@@ -116,10 +119,24 @@ export default function StoreEditor() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const storeName = searchParams.get('storeName') || 'My Store';
-
+  const templateId = (searchParams.get('template') || 'minimal') as keyof typeof TEMPLATES;
+  
+  // Load the selected template or use default
+  const selectedTemplate: TemplateConfig = TEMPLATES[templateId] || DEFAULT_TEMPLATE;
+  
   const [storeData, setStoreData] = useState<StoreData>({
-    ...INITIAL_STORE_DATA,
     storeName: storeName,
+    heroTitle: selectedTemplate.heroTitle,
+    heroSubtitle: selectedTemplate.heroSubtitle,
+    heroImage: selectedTemplate.heroImage,
+    products: selectedTemplate.products as Product[],
+    categories: selectedTemplate.categories,
+    primaryColor: selectedTemplate.primaryColor,
+    secondaryColor: selectedTemplate.secondaryColor,
+    accentColor: selectedTemplate.accentColor,
+    textColor: selectedTemplate.textColor,
+    aboutText: selectedTemplate.aboutText,
+    contactEmail: selectedTemplate.contactEmail,
   });
   const [currentPage, setCurrentPage] = useState<PageType>('home');
   const [isPreviewMode, setIsPreviewMode] = useState(false);
@@ -200,8 +217,11 @@ export default function StoreEditor() {
   // Professional Navbar Component
   const Navbar = () => (
     <div
-      className="sticky top-0 z-40 border-b"
-      style={{ backgroundColor: storeData.primaryColor, borderColor: '#e5e7eb' }}
+      className="sticky top-0 z-40 border-b shadow-lg"
+      style={{
+        background: selectedTemplate.navGradient || storeData.primaryColor,
+        borderColor: storeData.secondaryColor,
+      }}
     >
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-8">
@@ -209,22 +229,20 @@ export default function StoreEditor() {
             {storeData.storeName}
           </h1>
           <nav className="hidden md:flex items-center gap-8">
-            {[
-              { label: 'HOME', icon: House, page: 'home' as PageType },
-              { label: 'SHOP', icon: Storefront, page: 'shop' as PageType },
-              { label: 'ABOUT', icon: Question, page: 'about' as PageType },
-              { label: 'CONTACT', icon: EnvelopeSimple, page: 'contact' as PageType },
-            ].map((item) => (
-              <button
-                key={item.page}
-                onClick={() => setCurrentPage(item.page)}
-                className="text-sm font-semibold transition-colors hover:opacity-70 flex items-center gap-2"
-                style={{ color: currentPage === item.page ? storeData.accentColor : '#666' }}
-              >
-                <item.icon size={18} />
-                {item.label}
-              </button>
-            ))}
+            {selectedTemplate.navItems.map((item) => {
+              const IconComponent = item.icon as any;
+              return (
+                <button
+                  key={item.page}
+                  onClick={() => setCurrentPage(item.page)}
+                  className="text-sm font-semibold transition-colors hover:opacity-70 flex items-center gap-2"
+                  style={{ color: currentPage === item.page ? storeData.accentColor : '#cbd5e1' }}
+                >
+                  <IconComponent size={18} weight="fill" />
+                  {item.label}
+                </button>
+              );
+            })}
           </nav>
         </div>
         <button
@@ -232,7 +250,7 @@ export default function StoreEditor() {
           className="relative px-6 py-2 rounded font-semibold text-white text-sm transition-all hover:shadow-lg flex items-center gap-2"
           style={{ backgroundColor: storeData.accentColor }}
         >
-          <ShoppingCart size={18} />
+          <ShoppingCart size={18} weight="fill" />
           CART ({cartItems.length})
         </button>
       </div>
@@ -242,7 +260,7 @@ export default function StoreEditor() {
   // Hero Section
   const HeroSection = () => (
     <div
-      className="relative h-96 overflow-hidden rounded-xl shadow-lg"
+      className="relative h-96 overflow-hidden rounded-2xl shadow-2xl"
       style={{
         backgroundImage: `url('${storeData.heroImage}')`,
         backgroundSize: 'cover',
@@ -252,12 +270,13 @@ export default function StoreEditor() {
       <div
         className="absolute inset-0"
         style={{
-          background: 'linear-gradient(135deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.2) 100%)',
+          background: selectedTemplate.heroGradient || 'linear-gradient(135deg, rgba(10, 14, 39, 0.75) 0%, rgba(26, 31, 58, 0.6) 100%)',
         }}
       />
-      <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-white px-6">
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
         <motion.h2
           className="text-5xl md:text-6xl font-bold mb-4 leading-tight"
+          style={{ color: storeData.textColor }}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
@@ -266,6 +285,7 @@ export default function StoreEditor() {
         </motion.h2>
         <motion.p
           className="text-lg md:text-xl mb-8 max-w-2xl font-light"
+          style={{ color: '#cbd5e1' }}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
@@ -273,14 +293,17 @@ export default function StoreEditor() {
           {storeData.heroSubtitle}
         </motion.p>
         <motion.button
-          className="px-8 py-3 rounded font-semibold text-white transition-all hover:shadow-lg"
-          style={{ backgroundColor: storeData.accentColor }}
+          className="px-8 py-3 rounded-lg font-semibold transition-all hover:shadow-2xl"
+          style={{ 
+            backgroundColor: storeData.accentColor,
+            color: storeData.primaryColor
+          }}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
           onClick={() => setCurrentPage('shop')}
         >
-          EXPLORE COLLECTION
+          SHOP NOW
         </motion.button>
       </div>
     </div>
@@ -289,31 +312,39 @@ export default function StoreEditor() {
   // Category Filter Section
   const CategoryFilter = () => (
     <div
-      className="py-12 border-b"
-      style={{ backgroundColor: storeData.secondaryColor }}
+      className="py-8 border-b"
+      style={{ 
+        background: `linear-gradient(180deg, ${storeData.secondaryColor} 0%, ${storeData.primaryColor} 100%)`
+      }}
     >
       <div className="max-w-7xl mx-auto px-6">
-        <h3 className="text-sm font-bold text-gray-600 mb-6 uppercase tracking-widest">
-          Categories
+        <h3 className="text-xs font-bold mb-6 uppercase tracking-widest" style={{ color: '#a0aec0' }}>
+          Browse by Category
         </h3>
-        <div className="flex flex-wrap gap-4">
-          {storeData.categories.map((category) => (
-            <button
-              key={category}
-              onClick={() => setSelectedCategory(category)}
-              className={`px-6 py-2 rounded-lg font-semibold text-sm transition-all ${
-                selectedCategory === category
-                  ? 'text-white shadow-lg'
-                  : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400'
-              }`}
-              style={{
-                backgroundColor:
-                  selectedCategory === category ? storeData.accentColor : undefined,
-              }}
-            >
-              {category}
-            </button>
-          ))}
+        <div className="flex flex-wrap gap-3">
+          {storeData.categories.map((category) => {
+            const IconComponent = selectedTemplate.categoryIcons?.[category] as any;
+            return (
+              <button
+                key={category}
+                onClick={() => setSelectedCategory(category)}
+                className={`px-5 py-3 rounded-lg font-semibold text-sm transition-all flex items-center gap-2 ${
+                  selectedCategory === category
+                    ? 'shadow-lg'
+                    : ''
+                }`}
+                style={{
+                  backgroundColor:
+                    selectedCategory === category ? storeData.accentColor : '#2d3748',
+                  color: selectedCategory === category ? '#0a0e27' : '#cbd5e1',
+                  border: selectedCategory === category ? 'none' : '1px solid #4a5568',
+                }}
+              >
+                {IconComponent && <IconComponent size={16} weight="fill" />}
+                {category}
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>
@@ -322,30 +353,46 @@ export default function StoreEditor() {
   // Search Bar
   const SearchFilterBar = () => (
     <div
-      className="py-8 border-b"
-      style={{ backgroundColor: storeData.primaryColor, borderColor: '#e5e7eb' }}
+      className="py-6 border-b"
+      style={{ 
+        backgroundColor: storeData.primaryColor,
+        borderColor: storeData.secondaryColor
+      }}
     >
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex items-center gap-4">
           <div className="flex-1 relative">
             <MagnifyingGlass
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-              size={20}
+              className="absolute left-4 top-1/2 -translate-y-1/2"
+              size={18}
+              color="#718096"
+              weight="bold"
             />
             <input
               type="text"
               placeholder="Search products..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
-              style={{ '--tw-ring-color': storeData.accentColor } as any}
+              className="w-full pl-12 pr-4 py-3 rounded-lg focus:outline-none transition-all"
+              style={{ 
+                backgroundColor: '#2d3748',
+                color: '#e8eaed',
+                borderColor: '#4a5568',
+                border: '1px solid #4a5568',
+                '--tw-ring-color': storeData.accentColor
+              } as any}
             />
           </div>
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-2 px-4 py-3 rounded-lg transition-all"
+            style={{
+              backgroundColor: '#2d3748',
+              color: '#cbd5e1',
+              border: '1px solid #4a5568'
+            }}
           >
-            <FunnelSimple size={20} />
+            <FunnelSimple size={18} weight="bold" />
             <span className="font-semibold text-sm">Filter</span>
           </button>
         </div>
@@ -353,17 +400,22 @@ export default function StoreEditor() {
         <AnimatePresence>
           {showFilters && (
             <motion.div
-              className="mt-6 p-4 border border-gray-200 rounded-lg"
+              className="mt-6 p-4 rounded-lg"
+              style={{ backgroundColor: storeData.secondaryColor }}
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
             >
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-2 uppercase">
+                  <label className="block text-xs font-bold mb-2 uppercase" style={{ color: '#a0aec0' }}>
                     Sort By
                   </label>
-                  <select className="w-full px-3 py-2 border border-gray-300 rounded text-sm">
+                  <select className="w-full px-3 py-2 rounded text-sm" style={{ 
+                    backgroundColor: '#1a1f3a',
+                    color: '#e8eaed',
+                    border: '1px solid #4a5568'
+                  }}>
                     <option>Newest</option>
                     <option>Price: Low to High</option>
                     <option>Price: High to Low</option>
@@ -380,45 +432,49 @@ export default function StoreEditor() {
 
   // Products Grid
   const ProductsSection = () => (
-    <div className="py-16">
+    <div className="py-12" style={{ backgroundColor: storeData.primaryColor }}>
       <div className="max-w-7xl mx-auto px-6">
         <div className="mb-12">
-          <h2 className="text-4xl font-bold mb-2">Curated Collection</h2>
-          <p className="text-gray-600">
+          <h2 className="text-4xl font-bold mb-2" style={{ color: storeData.textColor }}>Featured Products</h2>
+          <p style={{ color: '#a0aec0' }}>
             Showing {filteredProducts.length} of {storeData.products.length} products
           </p>
         </div>
 
         {filteredProducts.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">No products found matching your criteria</p>
+            <p style={{ color: '#a0aec0' }} className="text-lg">No products found matching your criteria</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredProducts.map((product) => (
               <motion.div
                 key={product.id}
-                className="group rounded-lg overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 cursor-pointer"
-                whileHover={{ y: -8 }}
+                className="group rounded-xl overflow-hidden transition-all duration-300 cursor-pointer"
+                style={{
+                  backgroundColor: storeData.secondaryColor,
+                  border: '1px solid #4a5568'
+                }}
+                whileHover={{ y: -6, boxShadow: `0 20px 25px -5px ${storeData.accentColor}33` }}
                 onClick={() => {
                   setSelectedProduct(product);
                   setCurrentPage('product');
                 }}
               >
-                <div className="relative overflow-hidden h-64 bg-gray-100">
+                <div className="relative overflow-hidden h-64">
                   <img
                     src={product.image}
                     alt={product.name}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                   <div
                     className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
                     style={{
-                      background: `linear-gradient(135deg, ${storeData.accentColor}dd 0%, ${storeData.accentColor} 100%)`,
+                      background: `linear-gradient(135deg, ${storeData.accentColor}dd 0%, #0a0e27 100%)`,
                     }}
                   >
                     <button
-                      className="px-6 py-2 bg-white rounded font-semibold text-sm transition-all hover:shadow-lg"
+                      className="px-6 py-2 bg-white rounded-lg font-semibold text-sm transition-all hover:shadow-lg"
                       style={{ color: storeData.accentColor }}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -431,17 +487,28 @@ export default function StoreEditor() {
                   </div>
                 </div>
 
-                <div className="p-6">
-                  <div className="mb-3">
+                <div className="p-5">
+                  <div className="mb-3 flex items-center gap-2">
                     <span
-                      className="inline-block text-xs font-bold px-3 py-1 rounded-full text-white"
-                      style={{ backgroundColor: storeData.accentColor }}
+                      className="inline-block text-xs font-bold px-3 py-1 rounded-full"
+                      style={{ 
+                        backgroundColor: storeData.accentColor,
+                        color: storeData.primaryColor
+                      }}
                     >
                       {product.category}
                     </span>
+                    {product.badge && (
+                      <span className="text-xs font-bold px-3 py-1 rounded-full" style={{ 
+                        backgroundColor: '#4a5568',
+                        color: '#fbbf24'
+                      }}>
+                        {product.badge}
+                      </span>
+                    )}
                   </div>
-                  <h3 className="text-lg font-bold mb-1">{product.name}</h3>
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-2">{product.description}</p>
+                  <h3 className="text-lg font-bold mb-1" style={{ color: storeData.textColor }}>{product.name}</h3>
+                  <p style={{ color: '#a0aec0' }} className="text-sm mb-4 line-clamp-2">{product.description}</p>
                   <div className="flex items-center justify-between">
                     <span
                       className="text-2xl font-bold"
@@ -450,14 +517,17 @@ export default function StoreEditor() {
                       ${product.price.toFixed(2)}
                     </span>
                     <button
-                      className="px-4 py-2 rounded font-semibold text-white text-sm transition-all hover:shadow-lg"
-                      style={{ backgroundColor: storeData.accentColor }}
+                      className="px-4 py-2 rounded-lg font-semibold text-sm transition-all hover:shadow-lg"
+                      style={{ 
+                        backgroundColor: storeData.accentColor,
+                        color: storeData.primaryColor
+                      }}
                       onClick={(e) => {
                         e.stopPropagation();
                         addToCart(product.id);
                       }}
                     >
-                      Add to Cart
+                      Add
                     </button>
                   </div>
                 </div>
@@ -478,7 +548,8 @@ export default function StoreEditor() {
         <div className="max-w-7xl mx-auto px-6">
           <button
             onClick={() => setCurrentPage('shop')}
-            className="mb-8 flex items-center gap-2 px-4 py-2 text-gray-700 hover:text-gray-900"
+            className="mb-8 flex items-center gap-2 px-4 py-2"
+            style={{ color: storeData.accentColor }}
           >
             <ArrowLeft size={20} />
             Back to Shop
@@ -511,8 +582,8 @@ export default function StoreEditor() {
                 >
                   {selectedProduct.category}
                 </span>
-                <h1 className="text-5xl font-bold mb-2">{selectedProduct.name}</h1>
-                <p className="text-gray-600 text-lg">{selectedProduct.description}</p>
+                <h1 className="text-5xl font-bold mb-2" style={{ color: storeData.accentColor }}>{selectedProduct.name}</h1>
+                <p className="text-lg" style={{ color: '#a0aec0' }}>{selectedProduct.description}</p>
               </div>
 
               <div className="mb-8">
@@ -523,14 +594,14 @@ export default function StoreEditor() {
                   >
                     ${selectedProduct.price.toFixed(2)}
                   </span>
-                  <span className="text-gray-500">USD</span>
+                  <span style={{ color: '#a0aec0' }}>USD</span>
                 </div>
               </div>
 
               <div className="space-y-4 mb-8">
                 <div>
-                  <label className="block text-sm font-semibold mb-2">Quantity</label>
-                  <div className="flex items-center gap-4 w-fit border border-gray-300 rounded-lg p-2">
+                  <label className="block text-sm font-semibold mb-2" style={{ color: '#cbd5e1' }}>Quantity</label>
+                  <div className="flex items-center gap-4 w-fit border rounded-lg p-2" style={{ borderColor: '#2d3748', color: '#cbd5e1' }}>
                     <button className="text-xl hover:opacity-70">−</button>
                     <span className="w-8 text-center">1</span>
                     <button className="text-xl hover:opacity-70">+</button>
@@ -554,16 +625,16 @@ export default function StoreEditor() {
                 </button>
               </div>
 
-              <div className="mt-12 pt-8 border-t border-gray-300">
-                <h3 className="text-xl font-bold mb-4">Details</h3>
-                <ul className="space-y-3 text-gray-700">
+              <div className="mt-12 pt-8 border-t" style={{ borderColor: '#2d3748' }}>
+                <h3 className="text-xl font-bold mb-4" style={{ color: storeData.accentColor }}>Details</h3>
+                <ul className="space-y-3" style={{ color: '#a0aec0' }}>
                   <li className="flex justify-between">
                     <span>Category:</span>
-                    <strong>{selectedProduct.category}</strong>
+                    <strong style={{ color: '#cbd5e1' }}>{selectedProduct.category}</strong>
                   </li>
                   <li className="flex justify-between">
                     <span>SKU:</span>
-                    <strong>{selectedProduct.id}</strong>
+                    <strong style={{ color: '#cbd5e1' }}>{selectedProduct.id}</strong>
                   </li>
                   <li className="flex justify-between">
                     <span>In Stock:</span>
@@ -584,24 +655,25 @@ export default function StoreEditor() {
       <div className="max-w-4xl mx-auto px-6">
         <button
           onClick={() => setCurrentPage('home')}
-          className="mb-8 flex items-center gap-2 px-4 py-2 text-gray-700 hover:text-gray-900"
+          className="mb-8 flex items-center gap-2 px-4 py-2"
+          style={{ color: storeData.accentColor }}
         >
           <ArrowLeft size={20} />
           Back
         </button>
 
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <h1 className="text-5xl font-bold mb-8">About Us</h1>
+          <h1 className="text-5xl font-bold mb-8" style={{ color: storeData.accentColor }}>About Us</h1>
           <div className="prose prose-lg max-w-none">
-            <p className="text-xl text-gray-700 leading-relaxed mb-6">
+            <p className="text-xl leading-relaxed mb-6" style={{ color: '#a0aec0' }}>
               {storeData.aboutText}
             </p>
-            <p className="text-gray-600 leading-relaxed mb-6">
+            <p className="leading-relaxed mb-6" style={{ color: '#cbd5e1' }}>
               Since our founding, we have been committed to bringing you the finest curated goods from artisans and makers
               around the world. Each product is carefully selected to ensure it meets our high standards for quality,
               craftsmanship, and sustainability.
             </p>
-            <p className="text-gray-600 leading-relaxed">
+            <p className="leading-relaxed" style={{ color: '#cbd5e1' }}>
               We believe that buying mindfully means choosing quality over quantity. Our products are designed to last,
               bringing joy and functionality to your home for years to come.
             </p>
@@ -617,44 +689,60 @@ export default function StoreEditor() {
       <div className="max-w-2xl mx-auto px-6">
         <button
           onClick={() => setCurrentPage('home')}
-          className="mb-8 flex items-center gap-2 px-4 py-2 text-gray-700 hover:text-gray-900"
+          className="mb-8 flex items-center gap-2 px-4 py-2"
+          style={{ color: storeData.accentColor }}
         >
           <ArrowLeft size={20} />
           Back
         </button>
 
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <h1 className="text-5xl font-bold mb-4">Contact Us</h1>
-          <p className="text-xl text-gray-600 mb-12">
+          <h1 className="text-5xl font-bold mb-4" style={{ color: storeData.accentColor }}>Contact Us</h1>
+          <p className="text-xl mb-12" style={{ color: '#a0aec0' }}>
             We would love to hear from you. Get in touch with us today!
           </p>
 
           <form className="space-y-6">
             <div>
-              <label className="block text-sm font-semibold mb-2">Name</label>
+              <label className="block text-sm font-semibold mb-2" style={{ color: '#cbd5e1' }}>Name</label>
               <input
                 type="text"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
+                className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
                 placeholder="Your name"
-                style={{ '--tw-ring-color': storeData.accentColor } as any}
+                style={{ 
+                  '--tw-ring-color': storeData.accentColor,
+                  borderColor: '#2d3748',
+                  backgroundColor: '#1a1f3a',
+                  color: '#cbd5e1'
+                } as any}
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold mb-2">Email</label>
+              <label className="block text-sm font-semibold mb-2" style={{ color: '#cbd5e1' }}>Email</label>
               <input
                 type="email"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
+                className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
                 placeholder="your@email.com"
-                style={{ '--tw-ring-color': storeData.accentColor } as any}
+                style={{ 
+                  '--tw-ring-color': storeData.accentColor,
+                  borderColor: '#2d3748',
+                  backgroundColor: '#1a1f3a',
+                  color: '#cbd5e1'
+                } as any}
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold mb-2">Message</label>
+              <label className="block text-sm font-semibold mb-2" style={{ color: '#cbd5e1' }}>Message</label>
               <textarea
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
+                className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
                 placeholder="Your message"
                 rows={6}
-                style={{ '--tw-ring-color': storeData.accentColor } as any}
+                style={{ 
+                  '--tw-ring-color': storeData.accentColor,
+                  borderColor: '#2d3748',
+                  backgroundColor: '#1a1f3a',
+                  color: '#cbd5e1'
+                } as any}
               />
             </div>
             <button
@@ -666,14 +754,14 @@ export default function StoreEditor() {
             </button>
           </form>
 
-          <div className="mt-12 pt-12 border-t border-gray-300">
-            <h3 className="text-2xl font-bold mb-6">Other Ways to Reach Us</h3>
-            <div className="space-y-4 text-gray-700">
+          <div className="mt-12 pt-12 border-t" style={{ borderColor: '#2d3748' }}>
+            <h3 className="text-2xl font-bold mb-6" style={{ color: storeData.accentColor }}>Other Ways to Reach Us</h3>
+            <div className="space-y-4" style={{ color: '#a0aec0' }}>
               <p>
-                <strong>Email:</strong> {storeData.contactEmail}
+                <strong style={{ color: '#cbd5e1' }}>Email:</strong> {storeData.contactEmail}
               </p>
               <p>
-                <strong>Hours:</strong> Monday - Friday, 9 AM - 5 PM EST
+                <strong style={{ color: '#cbd5e1' }}>Hours:</strong> Monday - Friday, 9 AM - 5 PM EST
               </p>
             </div>
           </div>
@@ -698,18 +786,19 @@ export default function StoreEditor() {
         <div className="max-w-6xl mx-auto px-6">
           <button
             onClick={() => setCurrentPage('shop')}
-            className="mb-8 flex items-center gap-2 px-4 py-2 text-gray-700 hover:text-gray-900"
+            className="mb-8 flex items-center gap-2 px-4 py-2"
+            style={{ color: storeData.accentColor }}
           >
             <ArrowLeft size={20} />
             Continue Shopping
           </button>
 
-          <h1 className="text-5xl font-bold mb-12">Shopping Cart</h1>
+          <h1 className="text-5xl font-bold mb-12" style={{ color: storeData.accentColor }}>Shopping Cart</h1>
 
           {cartProducts.length === 0 ? (
             <div className="text-center py-16">
-              <ShoppingCart size={64} className="mx-auto text-gray-400 mb-4" />
-              <p className="text-2xl text-gray-600 mb-8">Your cart is empty</p>
+              <ShoppingCart size={64} className="mx-auto mb-4" style={{ color: '#a0aec0' }} />
+              <p className="text-2xl mb-8" style={{ color: '#a0aec0' }}>Your cart is empty</p>
               <button
                 onClick={() => setCurrentPage('shop')}
                 className="px-6 py-3 rounded font-semibold text-white"
@@ -726,7 +815,8 @@ export default function StoreEditor() {
                   {cartProducts.map((item) => (
                     <div
                       key={item.id}
-                      className="flex gap-6 p-6 border border-gray-200 rounded-lg"
+                      className="flex gap-6 p-6 border rounded-lg"
+                      style={{ borderColor: '#2d3748', backgroundColor: '#1a1f3a' }}
                     >
                       <img
                         src={item.image}
@@ -734,10 +824,10 @@ export default function StoreEditor() {
                         className="w-24 h-24 object-cover rounded"
                       />
                       <div className="flex-1">
-                        <h3 className="text-lg font-bold">{item.name}</h3>
-                        <p className="text-gray-600">${item.price.toFixed(2)}</p>
+                        <h3 className="text-lg font-bold" style={{ color: '#cbd5e1' }}>{item.name}</h3>
+                        <p style={{ color: '#a0aec0' }}>${item.price.toFixed(2)}</p>
                         <div className="flex items-center gap-4 mt-4">
-                          <span className="text-sm text-gray-600">Qty: {item.quantity}</span>
+                          <span className="text-sm" style={{ color: '#a0aec0' }}>Qty: {item.quantity}</span>
                           <button
                             onClick={() => removeFromCart(item.id)}
                             className="text-red-500 hover:text-red-700 text-sm font-semibold"
@@ -747,7 +837,7 @@ export default function StoreEditor() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-xl font-bold">
+                        <p className="text-xl font-bold" style={{ color: storeData.accentColor }}>
                           ${(item.price * item.quantity).toFixed(2)}
                         </p>
                       </div>
@@ -757,9 +847,9 @@ export default function StoreEditor() {
               </div>
 
               {/* Order Summary */}
-              <div className="bg-gray-50 p-6 rounded-lg h-fit">
-                <h3 className="text-xl font-bold mb-6">Order Summary</h3>
-                <div className="space-y-4 mb-6">
+              <div className="p-6 rounded-lg h-fit border" style={{ backgroundColor: '#1a1f3a', borderColor: '#2d3748' }}>
+                <h3 className="text-xl font-bold mb-6" style={{ color: storeData.accentColor }}>Order Summary</h3>
+                <div className="space-y-4 mb-6" style={{ color: '#a0aec0' }}>
                   <div className="flex justify-between">
                     <span>Subtotal</span>
                     <span>${total.toFixed(2)}</span>
@@ -774,8 +864,8 @@ export default function StoreEditor() {
                   </div>
                 </div>
                 <div
-                  className="border-t border-gray-300 pt-4 mb-6 flex justify-between text-xl font-bold"
-                  style={{ borderColor: storeData.accentColor }}
+                  className="border-t pt-4 mb-6 flex justify-between text-xl font-bold"
+                  style={{ borderColor: '#2d3748', color: storeData.accentColor }}
                 >
                   <span>Total</span>
                   <span>${(total + 10 + total * 0.1).toFixed(2)}</span>
@@ -806,95 +896,151 @@ export default function StoreEditor() {
     const total = cartProducts.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
     return (
-      <div className="py-16 bg-gray-50">
+      <div className="py-16">
         <div className="max-w-4xl mx-auto px-6">
           <button
             onClick={() => setCurrentPage('cart')}
-            className="mb-8 flex items-center gap-2 px-4 py-2 text-gray-700 hover:text-gray-900"
+            className="mb-8 flex items-center gap-2 px-4 py-2"
+            style={{ color: storeData.accentColor }}
           >
             <ArrowLeft size={20} />
             Back to Cart
           </button>
 
-          <h1 className="text-5xl font-bold mb-12">Checkout</h1>
+          <h1 className="text-5xl font-bold mb-12" style={{ color: storeData.accentColor }}>Checkout</h1>
 
           <div className="grid md:grid-cols-3 gap-8">
             {/* Checkout Form */}
-            <div className="md:col-span-2 bg-white p-8 rounded-lg">
-              <h2 className="text-2xl font-bold mb-6">Shipping Information</h2>
+            <div className="md:col-span-2 p-8 rounded-lg" style={{ backgroundColor: '#1a1f3a' }}>
+              <h2 className="text-2xl font-bold mb-6" style={{ color: storeData.accentColor }}>Shipping Information</h2>
               <form className="space-y-6">
                 <div className="grid md:grid-cols-2 gap-4">
                   <input
                     type="text"
                     placeholder="First Name"
-                    className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
-                    style={{ '--tw-ring-color': storeData.accentColor } as any}
+                    className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
+                    style={{ 
+                      '--tw-ring-color': storeData.accentColor,
+                      borderColor: '#2d3748',
+                      backgroundColor: '#0a0e27',
+                      color: '#cbd5e1'
+                    } as any}
                   />
                   <input
                     type="text"
                     placeholder="Last Name"
-                    className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
-                    style={{ '--tw-ring-color': storeData.accentColor } as any}
+                    className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
+                    style={{ 
+                      '--tw-ring-color': storeData.accentColor,
+                      borderColor: '#2d3748',
+                      backgroundColor: '#0a0e27',
+                      color: '#cbd5e1'
+                    } as any}
                   />
                 </div>
                 <input
                   type="email"
                   placeholder="Email"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
-                  style={{ '--tw-ring-color': storeData.accentColor } as any}
+                  className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
+                  style={{ 
+                    '--tw-ring-color': storeData.accentColor,
+                    borderColor: '#2d3748',
+                    backgroundColor: '#0a0e27',
+                    color: '#cbd5e1'
+                  } as any}
                 />
                 <input
                   type="text"
                   placeholder="Address"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
-                  style={{ '--tw-ring-color': storeData.accentColor } as any}
+                  className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
+                  style={{ 
+                    '--tw-ring-color': storeData.accentColor,
+                    borderColor: '#2d3748',
+                    backgroundColor: '#0a0e27',
+                    color: '#cbd5e1'
+                  } as any}
                 />
                 <div className="grid md:grid-cols-3 gap-4">
                   <input
                     type="text"
                     placeholder="City"
-                    className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
-                    style={{ '--tw-ring-color': storeData.accentColor } as any}
+                    className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
+                    style={{ 
+                      '--tw-ring-color': storeData.accentColor,
+                      borderColor: '#2d3748',
+                      backgroundColor: '#0a0e27',
+                      color: '#cbd5e1'
+                    } as any}
                   />
                   <input
                     type="text"
                     placeholder="State"
-                    className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
-                    style={{ '--tw-ring-color': storeData.accentColor } as any}
+                    className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
+                    style={{ 
+                      '--tw-ring-color': storeData.accentColor,
+                      borderColor: '#2d3748',
+                      backgroundColor: '#0a0e27',
+                      color: '#cbd5e1'
+                    } as any}
                   />
                   <input
                     type="text"
                     placeholder="ZIP Code"
-                    className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
-                    style={{ '--tw-ring-color': storeData.accentColor } as any}
+                    className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
+                    style={{ 
+                      '--tw-ring-color': storeData.accentColor,
+                      borderColor: '#2d3748',
+                      backgroundColor: '#0a0e27',
+                      color: '#cbd5e1'
+                    } as any}
                   />
                 </div>
 
-                <h2 className="text-2xl font-bold mt-12 mb-6">Payment Information</h2>
+                <h2 className="text-2xl font-bold mt-12 mb-6" style={{ color: storeData.accentColor }}>Payment Information</h2>
                 <input
                   type="text"
                   placeholder="Cardholder Name"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
-                  style={{ '--tw-ring-color': storeData.accentColor } as any}
+                  className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
+                  style={{ 
+                    '--tw-ring-color': storeData.accentColor,
+                    borderColor: '#2d3748',
+                    backgroundColor: '#0a0e27',
+                    color: '#cbd5e1'
+                  } as any}
                 />
                 <input
                   type="text"
                   placeholder="Card Number"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
-                  style={{ '--tw-ring-color': storeData.accentColor } as any}
+                  className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
+                  style={{ 
+                    '--tw-ring-color': storeData.accentColor,
+                    borderColor: '#2d3748',
+                    backgroundColor: '#0a0e27',
+                    color: '#cbd5e1'
+                  } as any}
                 />
                 <div className="grid grid-cols-2 gap-4">
                   <input
                     type="text"
                     placeholder="MM/YY"
-                    className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
-                    style={{ '--tw-ring-color': storeData.accentColor } as any}
+                    className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
+                    style={{ 
+                      '--tw-ring-color': storeData.accentColor,
+                      borderColor: '#2d3748',
+                      backgroundColor: '#0a0e27',
+                      color: '#cbd5e1'
+                    } as any}
                   />
                   <input
                     type="text"
                     placeholder="CVV"
-                    className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
-                    style={{ '--tw-ring-color': storeData.accentColor } as any}
+                    className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
+                    style={{ 
+                      '--tw-ring-color': storeData.accentColor,
+                      borderColor: '#2d3748',
+                      backgroundColor: '#0a0e27',
+                      color: '#cbd5e1'
+                    } as any}
                   />
                 </div>
 
@@ -909,9 +1055,9 @@ export default function StoreEditor() {
             </div>
 
             {/* Order Summary */}
-            <div className="bg-white p-6 rounded-lg h-fit">
-              <h3 className="text-xl font-bold mb-6">Order Summary</h3>
-              <div className="space-y-4 mb-6 max-h-64 overflow-y-auto">
+            <div className="p-6 rounded-lg h-fit" style={{ backgroundColor: '#1a1f3a' }}>
+              <h3 className="text-xl font-bold mb-6" style={{ color: storeData.accentColor }}>Order Summary</h3>
+              <div className="space-y-4 mb-6 max-h-64 overflow-y-auto" style={{ color: '#a0aec0' }}>
                 {cartProducts.map((item) => (
                   <div key={item.id} className="flex justify-between text-sm">
                     <span>{item.name} x{item.quantity}</span>
@@ -919,7 +1065,7 @@ export default function StoreEditor() {
                   </div>
                 ))}
               </div>
-              <div className="space-y-2 pt-6 border-t border-gray-300">
+              <div className="space-y-2 pt-6" style={{ borderTop: `1px solid #2d3748`, color: '#a0aec0' }}>
                 <div className="flex justify-between">
                   <span>Subtotal</span>
                   <span>${total.toFixed(2)}</span>
@@ -934,7 +1080,7 @@ export default function StoreEditor() {
                 </div>
                 <div
                   className="flex justify-between text-lg font-bold pt-4"
-                  style={{ borderTop: `2px solid ${storeData.accentColor}` }}
+                  style={{ borderTop: `2px solid ${storeData.accentColor}`, color: storeData.accentColor }}
                 >
                   <span>Total</span>
                   <span>${(total + 10 + total * 0.1).toFixed(2)}</span>
@@ -1603,15 +1749,15 @@ export default function StoreEditor() {
   const Footer = () => (
     <div
       className="border-t"
-      style={{ backgroundColor: storeData.secondaryColor, borderColor: '#e5e7eb' }}
+      style={{ backgroundColor: storeData.primaryColor, borderColor: storeData.secondaryColor }}
     >
       <div className="max-w-7xl mx-auto px-6 py-16">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
           <div>
-            <h3 className="text-xl font-bold mb-4" style={{ color: storeData.accentColor }}>
+            <h3 className="text-xl font-bold mb-4" style={{ color: '#ffffff' }}>
               {storeData.storeName}
             </h3>
-            <p className="text-gray-600 text-sm leading-relaxed">
+            <p className="text-sm leading-relaxed" style={{ color: '#cbd5e1' }}>
               Curated goods for a simpler, more intentional life.
             </p>
           </div>
@@ -1621,13 +1767,13 @@ export default function StoreEditor() {
             { title: 'Connect', links: ['Instagram', 'Facebook', 'Newsletter'] },
           ].map((col) => (
             <div key={col.title}>
-              <h4 className="font-bold text-gray-900 mb-4 text-sm uppercase tracking-widest">
+              <h4 className="font-bold mb-4 text-sm uppercase tracking-widest" style={{ color: '#ffffff' }}>
                 {col.title}
               </h4>
               <ul className="space-y-3">
                 {col.links.map((link) => (
                   <li key={link}>
-                    <a href="#" className="text-sm text-gray-600 hover:text-gray-900">
+                    <a href="#" className="text-sm hover:opacity-70 transition-opacity" style={{ color: '#a0aec0' }}>
                       {link}
                     </a>
                   </li>
@@ -1636,11 +1782,11 @@ export default function StoreEditor() {
             </div>
           ))}
         </div>
-        <div className="border-t border-gray-300 pt-8 flex justify-between text-sm text-gray-600">
+        <div className="border-t pt-8 flex justify-between text-sm" style={{ borderColor: storeData.secondaryColor, color: '#a0aec0' }}>
           <p>© 2025 {storeData.storeName}. All rights reserved.</p>
           <div className="flex gap-6">
-            <a href="#">Privacy Policy</a>
-            <a href="#">Terms of Service</a>
+            <a href="#" style={{ color: '#a0aec0' }} className="hover:opacity-70 transition-opacity">Privacy Policy</a>
+            <a href="#" style={{ color: '#a0aec0' }} className="hover:opacity-70 transition-opacity">Terms of Service</a>
           </div>
         </div>
       </div>
