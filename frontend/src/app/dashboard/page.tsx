@@ -6,6 +6,14 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { Plus, ShoppingCart, Package, TrendUp, ArrowRight } from 'phosphor-react';
 
+interface Store {
+  id: string;
+  name: string;
+  products: number;
+  sales: number;
+  created: string;
+}
+
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -27,22 +35,7 @@ const itemVariants = {
 
 export default function Dashboard() {
   const { user, walletAddress } = useWeb3Auth();
-  const [recentStores] = useState([
-    {
-      id: '1',
-      name: 'Fashion Store',
-      products: 24,
-      sales: 0,
-      created: '2 days ago',
-    },
-    {
-      id: '2',
-      name: 'Electronics Hub',
-      products: 15,
-      sales: 0,
-      created: '5 days ago',
-    },
-  ]);
+  const [recentStores] = useState<Store[]>([]);
 
   return (
   <div className="min-h-screen bg-(--onyx-white)">

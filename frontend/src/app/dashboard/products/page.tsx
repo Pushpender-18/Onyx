@@ -34,24 +34,7 @@ interface Product {
 }
 
 export default function ProductsPage() {
-  const [products, setProducts] = useState<Product[]>([
-    {
-      id: '1',
-      name: 'Premium Wireless Headphones',
-      price: 299.99,
-      description: 'High-quality sound with noise cancellation',
-      images: ['https://via.placeholder.com/200'],
-      category: 'Electronics',
-    },
-    {
-      id: '2',
-      name: 'Organic Cotton T-Shirt',
-      price: 45.99,
-      description: 'Comfortable and sustainable',
-      images: ['https://via.placeholder.com/200'],
-      category: 'Fashion',
-    },
-  ]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState<Partial<Product>>({
     name: '',
