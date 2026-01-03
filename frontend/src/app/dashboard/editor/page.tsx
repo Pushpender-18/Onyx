@@ -3,6 +3,7 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect, useTransition } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
+import toast from 'react-hot-toast';
 import {
   ArrowLeft,
   Eye,
@@ -22,6 +23,7 @@ import {
   EnvelopeSimple,
 } from 'phosphor-react';
 import { TEMPLATES, DEFAULT_TEMPLATE, type TemplateConfig } from '../templateConfig';
+import { SavePublishModal } from '@/components/SavePublishModal';
 
 interface Product {
   id: string;
@@ -48,70 +50,7 @@ interface StoreData {
   contactEmail: string;
 }
 
-const UNSPLASH_PRODUCTS = [
-  {
-    id: '1',
-    name: 'Ceramic Bowl',
-    price: 45.99,
-    image: 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop',
-    category: 'Ceramics',
-    description: 'Beautiful handmade ceramic bowl perfect for displaying fruits or serving dishes.',
-  },
-  {
-    id: '2',
-    name: 'Woven Textile',
-    price: 32.99,
-    image: 'https://images.unsplash.com/photo-1611087620459-cd7cea4ae4a0?w=500&h=500&fit=crop',
-    category: 'Textiles',
-    description: 'Premium handwoven textile with authentic patterns and natural dyes.',
-  },
-  {
-    id: '3',
-    name: 'Wooden Furniture',
-    price: 199.99,
-    image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=500&h=500&fit=crop',
-    category: 'Furniture',
-    description: 'Solid wood furniture piece crafted with sustainable materials.',
-  },
-  {
-    id: '4',
-    name: 'Decorative Vase',
-    price: 67.50,
-    image: 'https://images.unsplash.com/photo-1578500494198-246f612d03b3?w=500&h=500&fit=crop',
-    category: 'Ceramics',
-    description: 'Modern decorative vase with unique glaze finish.',
-  },
-  {
-    id: '5',
-    name: 'Wall Tapestry',
-    price: 55.00,
-    image: 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop',
-    category: 'Textiles',
-    description: 'Colorful wall tapestry featuring traditional motifs.',
-  },
-  {
-    id: '6',
-    name: 'Dining Table',
-    price: 450.00,
-    image: 'https://images.unsplash.com/photo-1551632786-de41ec16caf0?w=500&h=500&fit=crop',
-    category: 'Furniture',
-    description: 'Elegant dining table for six with natural finish.',
-  },
-];
 
-const INITIAL_STORE_DATA: StoreData = {
-  storeName: 'ECHO Store',
-  heroTitle: 'Curated Goods for a Simpler Life',
-  heroSubtitle: 'Discover handpicked products that celebrate craftsmanship and quality',
-  heroImage: 'https://images.unsplash.com/photo-1556740730-a0fbc0454d0a?w=1200&h=600&fit=crop',
-  products: UNSPLASH_PRODUCTS,
-  categories: ['All', 'Ceramics', 'Textiles', 'Furniture'],
-  primaryColor: '#ffffff',
-  secondaryColor: '#f8f8f8',
-  accentColor: '#c97a5a',
-  aboutText: 'We believe in craftsmanship and quality. Every product in our collection is handpicked to celebrate the artistry of makers around the world.',
-  contactEmail: 'hello@echostore.com',
-};
 
 type PageType = 'home' | 'shop' | 'product' | 'about' | 'contact' | 'cart' | 'checkout';
 
@@ -129,7 +68,7 @@ export default function StoreEditor() {
     heroTitle: selectedTemplate.heroTitle,
     heroSubtitle: selectedTemplate.heroSubtitle,
     heroImage: selectedTemplate.heroImage,
-    products: selectedTemplate.products as Product[],
+    products: [],
     categories: selectedTemplate.categories,
     primaryColor: selectedTemplate.primaryColor,
     secondaryColor: selectedTemplate.secondaryColor,
@@ -156,6 +95,7 @@ export default function StoreEditor() {
   const [showHeroImageUploadModal, setShowHeroImageUploadModal] = useState(false);
   const [heroUploadedImage, setHeroUploadedImage] = useState<string | null>(null);
   const [isHeroImageUpload, setIsHeroImageUpload] = useState(false);
+  const [showSavePublishModal, setShowSavePublishModal] = useState(false);
 
   const filteredProducts = storeData.products.filter((product) => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -212,6 +152,51 @@ export default function StoreEditor() {
     };
     setEditingProduct(newProduct);
     setShowProductModal(true);
+  };
+
+  // Publish handler
+  const handlePublish = async (finalStoreName: string) => {
+    // Simulate publishing delay
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
+    // Save store data to localStorage
+    const storeDataToSave = {
+      ...storeData,
+      storeName: finalStoreName,
+      publishedAt: new Date().toISOString(),
+    };
+
+    localStorage.setItem(
+      `onyx-store-${finalStoreName}`,
+      JSON.stringify(storeDataToSave)
+    );
+
+    // Save to a list of published stores
+    const publishedStores = JSON.parse(
+      localStorage.getItem('onyx-published-stores') || '[]'
+    );
+    if (
+      !publishedStores.find(
+        (store: any) => store.storeName === finalStoreName
+      )
+    ) {
+      publishedStores.push({
+        storeName: finalStoreName,
+        url: `https://${finalStoreName}.onyx-shop.vercel.app`,
+        publishedAt: new Date().toISOString(),
+      });
+      localStorage.setItem(
+        'onyx-published-stores',
+        JSON.stringify(publishedStores)
+      );
+    }
+
+    toast.success(`Store "${finalStoreName}" published successfully!`);
+
+    // Redirect to the published store after a short delay
+    setTimeout(() => {
+      window.location.href = `/${finalStoreName}`;
+    }, 2500);
   };
 
   // Professional Navbar Component
@@ -1884,10 +1869,7 @@ export default function StoreEditor() {
                 Preview
               </button>
               <button
-                onClick={() => {
-                  alert('Store saved successfully!');
-                  router.push('/dashboard/stores');
-                }}
+                onClick={() => setShowSavePublishModal(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg font-semibold transition-colors"
               >
                 <FloppyDisk size={18} weight="bold" />
@@ -2077,6 +2059,12 @@ export default function StoreEditor() {
       <ProductEditModal />
       <ImageUploadModal />
       <HeroImageUploadModal />
+      <SavePublishModal
+        isOpen={showSavePublishModal}
+        onClose={() => setShowSavePublishModal(false)}
+        onPublish={handlePublish}
+        initialStoreName={storeData.storeName}
+      />
     </div>
   );
 }
