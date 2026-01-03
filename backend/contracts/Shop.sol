@@ -1,71 +1,42 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
-struct Item {
-	string id;
-	string name;
-	string description;
-	uint256 price; // Price in wei
-	uint256 stock;
-	bool isActive;
-	string createdAt;
-	string updatedAt;
-	string[] ipfsHash; // IPFS hash for item image or metadata
-}
-
-struct Order {
-	address buyer;
-	uint256 itemId;
-	uint256 quantity;
-	uint256 totalPrice; // Total price in wei
-	uint256 timestamp;
-	bool isDelivered;
-}
+import {ShopDetails, Item, Order} from "./Types.sol";
 
 contract Shop {
-	address public owner;
+	ShopDetails public shopDetails;
 	uint256 public productCount;
 	uint256 public orderCount;
-	string public shopName;
-	string public shopType;
-	string public thumbnailIpfsHash;
-	string public description;
-	string public configuration; // JSON format for shop configuration
 	mapping(uint256 => Item) public items;
 	mapping(uint256 => Order) public orders;
 
 	// Shop constuctor
-	constructor(string memory _name, string memory _shopType, 
-				string memory _description, string memory _configuration, 
-				string memory _thumbnailIpfsHash, address _owner) {
-		owner = _owner;
-		shopName = _name;
-		shopType = _shopType;
-		description = _description;
-		configuration = _configuration;
-		thumbnailIpfsHash = _thumbnailIpfsHash;
+	constructor(ShopDetails memory _shopDetails) {
+		shopDetails = _shopDetails;
 		productCount = 0;
 		orderCount = 0;
 	}
 
 	// Adds a new product to the shop.
-	function addProduct(string calldata _uuid, string calldata _name, 
-						string calldata _description, uint256 _price,
-						uint256 _stock, string calldata _currentDate,
-						string[] calldata _ipfsHash) external {
-		require(msg.sender == owner, "Only owner can add products"); // Access control [Only the shop owner can add products]
+	function addProduct(Item memory _item) external {
+		require(msg.sender == shopDetails.owner, "Only owner can add products"); // Access control [Only the shop owner can add products]
 		// Add item in the array
 		items[productCount] = Item({
-			id: _uuid,
-			name: _name,
-			description: _description,
-			price: _price,
-			stock: _stock,
-			isActive: true,
-			createdAt: _currentDate,
-			updatedAt: _currentDate,
-			ipfsHash: _ipfsHash
+			id: _item.id,
+			name: _item.name,
+			description: _item.description,
+			price: _item.price,
+			stock: _item.stock,
+			isActive: _item.isActive,
+			createdAt: _item.createdAt,
+			updatedAt: _item.updatedAt,
+			ipfsHash: new string[](_item.ipfsHash.length)
 		});
+
+		for (uint i = 0; i < _item.ipfsHash.length; i++) {
+			items[productCount].ipfsHash[i] = _item.ipfsHash[i];
+		}
+
 		// Increment product count
 		productCount++;
 	}	
@@ -73,7 +44,7 @@ contract Shop {
 	// For now itemId is the index in the items mapping
 	// Remove a product from the shop.
 	function removeProduct(uint256 _itemId, string memory _currentDate) external {
-		require(msg.sender == owner, "Only owner can remove products");	// Access control [Only the shop owner can remove products]
+		require(msg.sender == shopDetails.owner, "Only owner can remove products");	// Access control [Only the shop owner can remove products]
 		require(_itemId < productCount, "Product does not exist");		// Validity check
 		require(items[_itemId].isActive, "Product already removed");	// Check if product is already inactive
 		items[_itemId].isActive = false;
@@ -83,20 +54,23 @@ contract Shop {
 	}
 
 	// Update product details.
-	function updateProduct(uint256 _itemId, uint256 _newPrice, uint256 _newStock, bool _isActive, string[] calldata _newIpfsHash, string calldata _currentDate) external {
-		require(msg.sender == owner, "Only owner can update products");	// Access control [Only the shop owner can update products]
-		require(_itemId < productCount, "Product does not exist");		// Validity check
+	function updateProduct(Item memory _item, uint256 _itemIndex) external {
+		require(msg.sender == shopDetails.owner, "Only owner can update products");	// Access control [Only the shop owner can update products]
+		require(_itemIndex < productCount, "Product does not exist");		// Validity check
 		
-		items[_itemId].price = _newPrice;
-		items[_itemId].stock = _newStock;
-		items[_itemId].isActive = _isActive;
-		items[_itemId].ipfsHash = _newIpfsHash;
-		items[_itemId].updatedAt = _currentDate;
+		items[_itemIndex].price = _item.price;
+		items[_itemIndex].stock = _item.stock;
+		items[_itemIndex].isActive = _item.isActive;
+		items[_itemIndex].updatedAt = _item.updatedAt;
+		items[_itemIndex].ipfsHash = new string[](_item.ipfsHash.length);
+		for (uint i = 0; i < _item.ipfsHash.length; i++) {
+			items[_itemIndex].ipfsHash[i] = _item.ipfsHash[i];
+		}
 	}
 
 	// Update stock for a product.
 	function updateStock(uint256 _itemId, uint256 _newStock, string calldata _currentDate) external {
-		require(msg.sender == owner, "Only owner can update stock");	// Access control [Only the shop owner can update stock]
+		require(msg.sender == shopDetails.owner, "Only owner can update stock");	// Access control [Only the shop owner can update stock]
 		require(_itemId < productCount, "Product does not exist");		// Validity check
 		items[_itemId].stock = _newStock;
 		items[_itemId].updatedAt = _currentDate;

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 import {Shop} from "./Shop.sol";
+import {ShopDetails} from "./Types.sol";
 
 contract Master {
     address public owner;
@@ -10,15 +11,13 @@ contract Master {
 
     event ShopCreated(address indexed owner, address shopAddress, string name);
 
-    function createShop(string calldata _name, string calldata _shopType,
-                        string calldata _description,string calldata _configuration,
-                        string calldata _thumbnailIpfsHash) external returns (address) {
-        Shop newShop = new Shop(_name, _shopType, _description, _configuration, _thumbnailIpfsHash, msg.sender);
+    function createShop(ShopDetails memory _shopDetails) external returns (address) {
+        Shop newShop = new Shop(_shopDetails);
         address shopAddress = address(newShop);
-        allShopNames.push(_name);
+        allShopNames.push(_shopDetails.shopName);
         allShopAddresses.push(shopAddress);
         shopOwnerRegistry[shopAddress] = msg.sender;
-        emit ShopCreated(msg.sender, shopAddress, _name);
+        emit ShopCreated(msg.sender, shopAddress, _shopDetails.shopName);
         return shopAddress;
     }
 
