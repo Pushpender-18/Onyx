@@ -69,13 +69,6 @@ export default function CreateStore() {
       description: storeDescription,
     });
 
-    // const result = await createShop(storeName, selectedTemplate, "none", "none");
-    // const result = await getAllShops();
-    // const result = await getShopDetails("Test");
-    // const result = await addItemToShop(undefined, "Item 2", 500, 50);
-    const result = await getItemsFromShop();
-    console.log('Shop:', result);
-
     // Redirect to editor
     router.push(`/dashboard/editor?template=${selectedTemplate}&storeName=${storeName}`);
   };
