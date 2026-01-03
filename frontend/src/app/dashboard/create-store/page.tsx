@@ -5,7 +5,14 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Check } from 'phosphor-react';
-import { addItemToShop, createShop, getAllShops, getItemsFromShop, getShopDetails } from '@/lib/shop_interaction';
+import {
+  FiTarget,
+  FiShoppingBag,
+  FiStar,
+  FiGift,
+  FiShoppingCart,
+  FiSettings,
+} from 'react-icons/fi';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -32,42 +39,14 @@ const TEMPLATES = [
     name: 'Minimal',
     description: 'Clean and simple design',
     features: ['Simple navigation', 'Focused on products', 'Fast loading'],
-    preview: '🎯',
-  },
-  {
-    id: 'classic',
-    name: 'Classic',
-    description: 'Traditional e-commerce layout',
-    features: ['Hero section', 'Product grid', 'Customer reviews'],
-    preview: '🏪',
-  },
-  {
-    id: 'modern',
-    name: 'Modern',
-    description: 'Contemporary design with animations',
-    features: ['Smooth animations', 'Dark mode ready', 'Mobile optimized'],
-    preview: '✨',
-  },
-  {
-    id: 'boutique',
-    name: 'Boutique',
-    description: 'Premium luxury store design',
-    features: ['Elegant typography', 'High-end styling', 'Featured products'],
-    preview: '💎',
-  },
-  {
-    id: 'marketplace',
-    name: 'Marketplace',
-    description: 'Multi-vendor marketplace',
-    features: ['Vendor management', 'Category filtering', 'Advanced search'],
-    preview: '🛍️',
+    icon: FiTarget,
   },
   {
     id: 'tech',
     name: 'Tech Store',
     description: 'Technology and gadgets focused',
     features: ['Specs showcase', 'Tech comparisons', 'Review section'],
-    preview: '⚙️',
+    icon: FiSettings,
   },
 ];
 
@@ -195,8 +174,8 @@ export default function CreateStore() {
                 whileTap={{ scale: 0.98 }}
               >
                 {/* Template Preview */}
-                <div className="w-full h-32 bg-(--onyx-grey-lighter)/30 rounded-lg flex items-center justify-center mb-4 text-5xl">
-                  {template.preview}
+                <div className="w-full h-32 bg-(--onyx-grey-lighter)/30 rounded-lg flex items-center justify-center mb-4">
+                  <template.icon size={80} className="text-(--accent-gold)" />
                 </div>
 
                 {/* Template Info */}

@@ -31,33 +31,28 @@ export default function Navigation() {
     }
   };
 
-  const isHomePage = pathname === '/';
   const isDashboard = pathname.startsWith('/dashboard');
 
   return (
-  <nav className="sticky top-0 z-50 bg-(--onyx-white) border-b border-(--onyx-grey-lighter) backdrop-blur-sm">
+    <nav className="sticky top-0 z-50 bg-(--onyx-white) border-b border-(--onyx-grey-lighter)">
       <div className="container-custom">
-        <div className="flex items-center justify-between h-16 md:h-20">
+        <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link
             href="/"
-            className="flex items-center gap-2 group"
+            className="flex items-center gap-2"
           >
-            <motion.div
-              className="w-8 h-8 md:w-10 md:h-10 bg-linear-to-br from-(--onyx-stone) to-(--onyx-dark) rounded-lg flex items-center justify-center transform"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
+            <div className="w-8 h-8 bg-linear-to-br from-(--onyx-stone) to-(--onyx-dark) rounded-lg flex items-center justify-center">
               <span className="text-(--onyx-white) font-bold text-lg">◆</span>
-            </motion.div>
-            <span className="text-xl md:text-2xl font-bold text-(--onyx-stone) hidden sm:inline">
+            </div>
+            <span className="text-xl font-bold text-(--onyx-stone)">
               Onyx
             </span>
           </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
-            {isAuthenticated && isDashboard && (
+            {isAuthenticated && (
               <>
                 <Link
                   href="/dashboard"
@@ -106,42 +101,36 @@ export default function Navigation() {
                 </div>
 
                 {/* Logout Button */}
-                <motion.button
+                <button
                   onClick={handleLogout}
                   disabled={isLoading}
                   className="btn-secondary text-sm flex items-center gap-2"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
                 >
                   <SignOut size={16} weight="bold" />
                   <span className="hidden sm:inline">Logout</span>
-                </motion.button>
+                </button>
               </>
             ) : (
-              <motion.button
+              <button
                 onClick={handleLogin}
                 disabled={isLoading}
                 className="btn-primary text-sm"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
               >
                 {isLoading ? 'Connecting...' : 'Connect Wallet'}
-              </motion.button>
+              </button>
             )}
 
             {/* Mobile Menu Button */}
-            <motion.button
+            <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="md:hidden p-2 hover:bg-(--onyx-grey-lighter) rounded-lg transition-colors"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
             >
               {isMenuOpen ? (
                 <X size={24} weight="bold" className="text-(--onyx-stone)" />
               ) : (
                 <List size={24} weight="bold" className="text-(--onyx-stone)" />
               )}
-            </motion.button>
+            </button>
           </div>
         </div>
 
@@ -156,7 +145,7 @@ export default function Navigation() {
           className="md:hidden overflow-hidden"
         >
           <div className="px-4 py-4 space-y-3 border-t border-(--onyx-grey-lighter)">
-            {isAuthenticated && isDashboard && (
+            {isAuthenticated && (
               <>
                 <Link
                   href="/dashboard"

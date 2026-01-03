@@ -34,32 +34,7 @@ interface Store {
 }
 
 export default function StoresPage() {
-  const stores: Store[] = [
-    {
-      id: '1',
-      name: 'Fashion Store',
-      description: 'Premium clothing and accessories',
-      products: 24,
-      created: '2024-01-10',
-      template: 'classic',
-    },
-    {
-      id: '2',
-      name: 'Electronics Hub',
-      description: 'Latest tech gadgets',
-      products: 15,
-      created: '2024-01-05',
-      template: 'tech',
-    },
-    {
-      id: '3',
-      name: 'Home & Living',
-      description: 'Home decor and essentials',
-      products: 32,
-      created: '2023-12-28',
-      template: 'modern',
-    },
-  ];
+  const stores: Store[] = [];
 
   return (
   <div className="min-h-screen bg-(--onyx-white)">
