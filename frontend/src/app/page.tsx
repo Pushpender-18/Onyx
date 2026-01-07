@@ -3,9 +3,9 @@
 import React from 'react';
 import { FaWallet, FaStore, FaRocket } from 'react-icons/fa';
 import Link from 'next/link';
-import { useWeb3Auth } from '@/context/Web3AuthContext';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
+import { useWeb3Auth } from '@/context/Web3AuthContext';
 import {
   Cube,
   ShoppingCart,
@@ -36,19 +36,15 @@ const itemVariants = {
 } as const;
 
 export default function Home() {
-  const { isAuthenticated, login, isLoading } = useWeb3Auth();
   const router = useRouter();
+  const { login, isLoading } = useWeb3Auth();
 
   const handleGetStarted = async () => {
-    if (isAuthenticated) {
+    try {
+      await login();
       router.push('/dashboard');
-    } else {
-      try {
-        await login();
-        router.push('/dashboard');
-      } catch (error) {
-        console.error('Login failed:', error);
-      }
+    } catch (error) {
+      console.error('Failed to start:', error);
     }
   };
 

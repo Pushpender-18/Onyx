@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { Plus, Trash, Pencil, Package } from 'phosphor-react';
@@ -73,13 +74,14 @@ export default function ProductsPage() {
   };
 
   return (
-  <div className="min-h-screen bg-(--onyx-white)">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-  className="border-b border-(--onyx-grey-lighter)"
-      >
+    <ProtectedRoute>
+      <div className="min-h-screen bg-(--onyx-white)">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="border-b border-(--onyx-grey-lighter)"
+        >
         <div className="container-custom py-8">
           <div className="flex items-center justify-between">
             <div>
@@ -266,5 +268,6 @@ export default function ProductsPage() {
         )}
       </div>
     </div>
+    </ProtectedRoute>
   );
 }

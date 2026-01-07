@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { Plus, Pencil, Eye, ShoppingCart, ArrowRight } from 'phosphor-react';
@@ -37,11 +38,12 @@ export default function StoresPage() {
   const stores: Store[] = [];
 
   return (
-  <div className="min-h-screen bg-(--onyx-white)">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
+    <ProtectedRoute>
+      <div className="min-h-screen bg-(--onyx-white)">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
   className="border-b border-(--onyx-grey-lighter)"
       >
         <div className="container-custom py-8">
@@ -164,5 +166,6 @@ export default function StoresPage() {
         )}
       </div>
     </div>
+    </ProtectedRoute>
   );
 }

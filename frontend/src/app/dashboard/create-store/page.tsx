@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -74,9 +75,10 @@ export default function CreateStore() {
   };
 
   return (
-    <div className="min-h-screen bg-(--onyx-white)">
-      {/* Header */}
-      <motion.div
+    <ProtectedRoute>
+      <div className="min-h-screen bg-(--onyx-white)">
+        {/* Header */}
+        <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         className="border-b border-(--onyx-grey-lighter)"
@@ -227,5 +229,6 @@ export default function CreateStore() {
         </motion.div>
       </div>
     </div>
+    </ProtectedRoute>
   );
 }

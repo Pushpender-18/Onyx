@@ -1,56 +1,81 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { Web3AuthContextType, User } from '@/types';
 
 const Web3AuthContext = createContext<Web3AuthContextType | undefined>(undefined);
 
+// Dummy user data
+const DUMMY_USER: User = {
+  id: '0x1234567890123456789012345678901234567890',
+  walletAddress: '0x1234567890123456789012345678901234567890',
+  name: 'Demo User',
+  email: 'demo@onyx.com',
+  createdAt: new Date(),
+};
+
+// Constants for localStorage
+const AUTH_STORAGE_KEY = 'onyx_auth_state';
+const USER_STORAGE_KEY = 'onyx_user_data';
+const WALLET_STORAGE_KEY = 'onyx_wallet_address';
+
 export const Web3AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
 
-  // Check if user is already logged in from localStorage
+  // Initialize auth state from localStorage on mount
   useEffect(() => {
-    const storedUser = localStorage.getItem('onyx_user');
-    const storedAddress = localStorage.getItem('onyx_wallet');
-
-    if (storedUser && storedAddress) {
+    const initializeAuthState = () => {
       try {
-        const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
-        setWalletAddress(storedAddress);
-        setIsAuthenticated(true);
+        const storedAuthState = localStorage.getItem(AUTH_STORAGE_KEY);
+        const storedUser = localStorage.getItem(USER_STORAGE_KEY);
+        const storedWallet = localStorage.getItem(WALLET_STORAGE_KEY);
+
+        if (storedAuthState === 'true' && storedUser && storedWallet) {
+          const parsedUser = JSON.parse(storedUser);
+          setIsAuthenticated(true);
+          setUser(parsedUser);
+          setWalletAddress(storedWallet);
+          console.log('✅ Auth state restored from localStorage');
+        }
       } catch (error) {
-        console.error('Error parsing stored user:', error);
-        localStorage.removeItem('onyx_user');
-        localStorage.removeItem('onyx_wallet');
+        console.error('Error restoring auth state:', error);
+        // Clear invalid data
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+        localStorage.removeItem(USER_STORAGE_KEY);
+        localStorage.removeItem(WALLET_STORAGE_KEY);
+      } finally {
+        setIsLoading(false);
       }
-    }
+    };
+
+    initializeAuthState();
   }, []);
 
   const login = async () => {
     try {
       setIsLoading(true);
-      // Placeholder for Web3Auth integration
-      // In production, this would initialize Web3Auth modal
-      const mockAddress = '0x' + Math.random().toString(16).slice(2) + Math.random().toString(16).slice(2);
+      
+      // Simulate async login
+      await new Promise(resolve => setTimeout(resolve, 500));
 
-      const newUser: User = {
-        id: mockAddress,
-        walletAddress: mockAddress,
-        createdAt: new Date(),
-      };
-
-      setWalletAddress(mockAddress);
       setIsAuthenticated(true);
-      setUser(newUser);
+      setUser(DUMMY_USER);
+      setWalletAddress(DUMMY_USER.walletAddress);
 
-      localStorage.setItem('onyx_user', JSON.stringify(newUser));
-      localStorage.setItem('onyx_wallet', mockAddress);
+      // Persist auth state to localStorage
+      localStorage.setItem(AUTH_STORAGE_KEY, 'true');
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(DUMMY_USER));
+      localStorage.setItem(WALLET_STORAGE_KEY, DUMMY_USER.walletAddress);
+      
+      console.log('✅ Dummy user logged in:', DUMMY_USER);
     } catch (error) {
       console.error('Login error:', error);
+      setIsAuthenticated(false);
+      setUser(null);
+      setWalletAddress(null);
       throw error;
     } finally {
       setIsLoading(false);
@@ -60,12 +85,20 @@ export const Web3AuthProvider: React.FC<{ children: ReactNode }> = ({ children }
   const logout = async () => {
     try {
       setIsLoading(true);
+
+      // Simulate async logout
+      await new Promise(resolve => setTimeout(resolve, 300));
+
       setIsAuthenticated(false);
       setUser(null);
       setWalletAddress(null);
 
-      localStorage.removeItem('onyx_user');
-      localStorage.removeItem('onyx_wallet');
+      // Clear auth state from localStorage
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+      localStorage.removeItem(USER_STORAGE_KEY);
+      localStorage.removeItem(WALLET_STORAGE_KEY);
+      
+      console.log('✅ User logged out successfully');
     } catch (error) {
       console.error('Logout error:', error);
       throw error;
@@ -75,8 +108,8 @@ export const Web3AuthProvider: React.FC<{ children: ReactNode }> = ({ children }
   };
 
   const getIdToken = async (): Promise<string | null> => {
-    // Placeholder for Web3Auth token
-    return localStorage.getItem('onyx_idtoken');
+    // Return dummy token
+    return isAuthenticated ? 'dummy-id-token' : null;
   };
 
   const value: Web3AuthContextType = {

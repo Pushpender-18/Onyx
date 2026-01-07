@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useMemo, useRef, useEffect, useTransition } from 'react';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -1843,7 +1844,8 @@ export default function StoreEditor() {
 
   // Editor Mode
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <ProtectedRoute>
+      <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Editor Header */}
       <div className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 py-4">
@@ -2066,5 +2068,6 @@ export default function StoreEditor() {
         initialStoreName={storeData.storeName}
       />
     </div>
+    </ProtectedRoute>
   );
 }

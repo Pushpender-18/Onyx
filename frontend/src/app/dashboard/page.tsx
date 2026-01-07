@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useWeb3Auth } from '@/context/Web3AuthContext';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { Plus, ShoppingCart, Package, TrendUp, ArrowRight } from 'phosphor-react';
@@ -38,30 +39,31 @@ export default function Dashboard() {
   const [recentStores] = useState<Store[]>([]);
 
   return (
-  <div className="min-h-screen bg-(--onyx-white)">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-  className="border-b border-(--onyx-grey-lighter)"
-      >
-        <div className="container-custom py-8">
-          <h1 className="text-4xl font-bold text-(--onyx-stone) mb-2">Dashboard</h1>
-          <p className="text-(--onyx-grey)">
-            Welcome back, {user?.name || walletAddress?.slice(0, 6)}...
-          </p>
-        </div>
-      </motion.div>
-
-      {/* Main Content */}
-      <div className="container-custom py-8 space-y-8">
-        {/* Action Buttons */}
+    <ProtectedRoute>
+      <div className="min-h-screen bg-(--onyx-white)">
+        {/* Header */}
         <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="grid grid-cols-1 md:grid-cols-2 gap-4"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="border-b border-(--onyx-grey-lighter)"
         >
+          <div className="container-custom py-8">
+            <h1 className="text-4xl font-bold text-(--onyx-stone) mb-2">Dashboard</h1>
+            <p className="text-(--onyx-grey)">
+              Welcome back, {user?.name || walletAddress?.slice(0, 6)}...
+            </p>
+          </div>
+        </motion.div>
+
+        {/* Main Content */}
+        <div className="container-custom py-8 space-y-8">
+          {/* Action Buttons */}
+          <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className="grid grid-cols-1 md:grid-cols-2 gap-4"
+          >
           <motion.div variants={itemVariants}>
             <Link
               href="/dashboard/create-store"
@@ -256,7 +258,8 @@ export default function Dashboard() {
             ))}
           </motion.ul>
         </motion.div>
+        </div>
       </div>
-    </div>
+    </ProtectedRoute>
   );
 }
