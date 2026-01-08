@@ -2,7 +2,7 @@
 
 import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useWeb3Auth } from '@/context/Web3AuthContext';
+import { useWeb3Auth } from '@web3auth/modal/react';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -14,17 +14,17 @@ interface ProtectedRouteProps {
  */
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const router = useRouter();
-  const { isAuthenticated, isLoading } = useWeb3Auth();
+  const { isConnected, isInitializing } = useWeb3Auth();
 
   useEffect(() => {
     // Only redirect if we've finished loading and user is not authenticated
-    if (!isLoading && !isAuthenticated) {
+    if (!isInitializing && !isConnected) {
       router.push('/');
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isConnected, isInitializing, router]);
 
   // Show loading state while checking authentication
-  if (isLoading) {
+  if (isInitializing) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-(--onyx-white)">
         <div className="text-center space-y-4">
@@ -38,7 +38,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   }
 
   // If not authenticated, return null (will redirect)
-  if (!isAuthenticated) {
+  if (!isConnected) {
     return null;
   }
 

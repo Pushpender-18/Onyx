@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useWeb3Auth } from '@/context/Web3AuthContext';
+import { useWeb3AuthUser } from '@web3auth/modal/react';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { Plus, ShoppingCart, Package, TrendUp, ArrowRight } from 'phosphor-react';
+import { useConnection } from 'wagmi';
 
 interface Store {
   id: string;
@@ -35,7 +36,9 @@ const itemVariants = {
 };
 
 export default function Dashboard() {
-  const { user, walletAddress } = useWeb3Auth();
+  const { userInfo } = useWeb3AuthUser();
+  const userName = userInfo?.name ? userInfo.name : "User";
+
   const [recentStores] = useState<Store[]>([]);
 
   return (
@@ -50,7 +53,7 @@ export default function Dashboard() {
           <div className="container-custom py-8">
             <h1 className="text-4xl font-bold text-(--onyx-stone) mb-2">Dashboard</h1>
             <p className="text-(--onyx-grey)">
-              Welcome back, {user?.name || walletAddress?.slice(0, 6)}...
+              Welcome back, {userName}
             </p>
           </div>
         </motion.div>

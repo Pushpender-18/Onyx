@@ -5,7 +5,7 @@ import { FaWallet, FaStore, FaRocket } from 'react-icons/fa';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { useWeb3Auth } from '@/context/Web3AuthContext';
+import { useWeb3Auth} from '@/context/Web3AuthContext';
 import {
   Cube,
   ShoppingCart,
@@ -37,11 +37,10 @@ const itemVariants = {
 
 export default function Home() {
   const router = useRouter();
-  const { login, isLoading } = useWeb3Auth();
 
   const handleGetStarted = async () => {
     try {
-      await login();
+      // await login();
       router.push('/dashboard');
     } catch (error) {
       console.error('Failed to start:', error);
@@ -117,12 +116,12 @@ export default function Home() {
               >
                 <motion.button
                   onClick={handleGetStarted}
-                  disabled={isLoading}
+                  disabled={false}
                   className="btn-primary flex items-center justify-center gap-2"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
-                  {isLoading ? 'Connecting...' : 'Get Started'}
+                  {false ? 'Connecting...' : 'Get Started'}
                   <ArrowRight size={18} weight="bold" />
                 </motion.button>
                 <motion.a
@@ -393,12 +392,12 @@ export default function Home() {
             <motion.button
               variants={itemVariants}
               onClick={handleGetStarted}
-              disabled={isLoading}
+              disabled={false}
               className="bg-(--accent-gold) text-(--onyx-black) px-8 py-4 rounded-lg font-semibold flex items-center gap-2 mx-auto hover:shadow-lg transition-shadow"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              {isLoading ? 'Connecting...' : 'Get Started Now'}
+              {false ? 'Connecting...' : 'Get Started Now'}
               <ArrowRight size={20} weight="bold" />
             </motion.button>
           </motion.div>
@@ -407,3 +406,5 @@ export default function Home() {
     </div>
   );
 }
+
+
