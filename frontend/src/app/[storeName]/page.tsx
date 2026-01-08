@@ -5,6 +5,8 @@ import { useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ShoppingCart, House, Heart } from 'phosphor-react';
 import toast from 'react-hot-toast';
+import { useShop } from '@/context/ShopContext';
+import { Store, Product as StoreProduct } from '@/types';
 
 interface Product {
   id: string;
@@ -35,7 +37,10 @@ interface StoreData {
 export default function PublishedStorePage() {
   const params = useParams();
   const storeName = params.storeName as string;
+  const { stores, products, getProducts, getStoreByName } = useShop();
   const [storeData, setStoreData] = useState<StoreData | null>(null);
+  const [store, setStore] = useState<Store | null>(null);
+  const [storeProducts, setStoreProducts] = useState<StoreProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<string>('home');
@@ -46,23 +51,75 @@ export default function PublishedStorePage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   useEffect(() => {
-    // Load store data from localStorage
-    const savedStore = localStorage.getItem(`onyx-store-${storeName}`);
-
-    if (savedStore) {
+    const loadStore = async () => {
+      setLoading(true);
       try {
-        const data = JSON.parse(savedStore);
-        setStoreData(data);
-        setError(null);
-      } catch (err) {
-        setError('Failed to load store data');
-        console.error(err);
-      }
-    } else {
-      setError('Store not found. It may not have been published yet.');
-    }
+        console.log('🏪 Loading storefront for:', storeName);
+        
+        // First try to find in loaded stores
+        let foundStore = stores.find(s => s.name.toLowerCase() === storeName.toLowerCase());
+        
+        // If not found, fetch from blockchain
+        if (!foundStore) {
+          console.log('📡 Store not in cache, fetching from blockchain...');
+          const fetchedStore = await getStoreByName(storeName);
+          if (fetchedStore) {
+            foundStore = fetchedStore;
+          }
+        }
+        
+        if (!foundStore) {
+          setError('Store not found. It may not have been published yet.');
+          setLoading(false);
+          return;
+        }
 
-    setLoading(false);
+        console.log('✅ Store found:', foundStore);
+        setStore(foundStore);
+
+        // Load products for this store
+        const storeProds = await getProducts(foundStore.id);
+        console.log('📦 Store products:', storeProds);
+        setStoreProducts(storeProds);
+
+        // Convert to StoreData format for existing UI
+        const categories = [...new Set(storeProds.map(p => p.metadata?.category || 'Uncategorized'))];
+        
+        const convertedData: StoreData = {
+          storeName: foundStore.name,
+          heroTitle: foundStore.name,
+          heroSubtitle: foundStore.description || 'Welcome to our store',
+          heroImage: '', // TODO: Add hero image support
+          products: storeProds.map(p => ({
+            id: p.id,
+            name: p.name,
+            price: p.price,
+            image: p.images[0] || '',
+            category: p.metadata?.category || 'Uncategorized',
+            description: p.description,
+            badge: p.isPublished ? undefined : 'Draft',
+          })),
+          categories: ['All', ...categories],
+          primaryColor: foundStore.customization?.primaryColor || '#1a1a1a',
+          secondaryColor: foundStore.customization?.secondaryColor || '#d4af37',
+          accentColor: foundStore.customization?.primaryColor || '#1a1a1a',
+          textColor: '#1a1a1a',
+          aboutText: foundStore.description || '',
+          contactEmail: 'contact@' + foundStore.name.toLowerCase().replace(/\s+/g, '') + '.com',
+          publishedAt: foundStore.createdAt.toISOString(),
+        };
+
+        setStoreData(convertedData);
+        setError(null);
+      } catch (err: any) {
+        console.error('❌ Error loading store:', err);
+        setError('Failed to load store data: ' + err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadStore();
   }, [storeName]);
 
   if (loading) {

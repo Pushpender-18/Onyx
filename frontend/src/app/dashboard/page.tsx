@@ -7,6 +7,14 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { Plus, ShoppingCart, Package, TrendUp, ArrowRight } from 'phosphor-react';
 import { useConnection } from 'wagmi';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useWeb3Auth } from '@/context/Web3AuthContext';
+import { useShop } from '@/context/ShopContext';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { motion } from 'framer-motion';
+import Link from 'next/link';
+import { Plus, ShoppingCart, Package, TrendUp, ArrowRight, ArrowsClockwise } from 'phosphor-react';
 
 interface Store {
   id: string;
@@ -40,6 +48,37 @@ export default function Dashboard() {
   const userName = userInfo?.name ? userInfo.name : "User";
 
   const [recentStores] = useState<Store[]>([]);
+  const router = useRouter();
+  const { user, walletAddress } = useWeb3Auth();
+  const { stores, products, isLoading, getAllStores, refreshData } = useShop();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Load stores from blockchain on mount
+  useEffect(() => {
+    if (stores.length === 0 && !isLoading) {
+      getAllStores();
+    }
+  }, []);
+
+  // Calculate stats from actual data
+  const totalStores = stores.length;
+  const totalProducts = products.length;
+  const totalSales = 0; // This would need to be tracked in smart contract
+
+  // Get product count for each store
+  const getProductCount = (storeId: string) => {
+    return products.filter(p => p.storeId === storeId).length;
+  };
+
+  // Get recent stores (last 5)
+  const recentStores = stores.slice(0, 5);
+
+  // Handle refresh from blockchain
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refreshData();
+    setIsRefreshing(false);
+  };
 
   return (
     <ProtectedRoute>
@@ -51,10 +90,29 @@ export default function Dashboard() {
           className="border-b border-(--onyx-grey-lighter)"
         >
           <div className="container-custom py-8">
-            <h1 className="text-4xl font-bold text-(--onyx-stone) mb-2">Dashboard</h1>
-            <p className="text-(--onyx-grey)">
-              Welcome back, {userName}
-            </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-4xl font-bold text-(--onyx-stone) mb-2">Dashboard</h1>
+                <p className="text-(--onyx-grey)">
+                  Welcome back, {user?.name || walletAddress?.slice(0, 6)}...
+                </p>
+              </div>
+              <motion.button
+                onClick={handleRefresh}
+                disabled={isRefreshing || isLoading}
+                className="btn-secondary flex items-center gap-2"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                title="Refresh from blockchain"
+              >
+                <ArrowsClockwise 
+                  size={20} 
+                  weight="bold" 
+                  className={isRefreshing ? 'animate-spin' : ''}
+                />
+                {isRefreshing ? 'Syncing...' : 'Sync'}
+              </motion.button>
+            </div>
           </div>
         </motion.div>
 
@@ -116,17 +174,17 @@ export default function Dashboard() {
           {[
             {
               label: 'Total Stores',
-              value: recentStores.length,
+              value: totalStores,
               icon: ShoppingCart,
             },
             {
               label: 'Total Products',
-              value: recentStores.reduce((acc, store) => acc + store.products, 0),
+              value: totalProducts,
               icon: Package,
             },
             {
               label: 'Total Sales',
-              value: '$0',
+              value: `$${totalSales}`,
               icon: TrendUp,
             },
           ].map((stat, index) => (
@@ -185,6 +243,7 @@ export default function Dashboard() {
                 <motion.div
                   key={store.id}
                   variants={itemVariants}
+                  onClick={() => router.push(`/dashboard/stores/${store.id}`)}
                   className="flex items-start justify-between p-4 bg-(--onyx-grey-lighter)/30 rounded-lg hover:bg-(--onyx-grey-lighter)/50 transition-colors cursor-pointer group"
                   whileHover={{ x: 5 }}
                 >
@@ -193,12 +252,12 @@ export default function Dashboard() {
                       {store.name}
                     </h3>
                     <p className="text-sm text-(--onyx-grey) mt-1">
-                      {store.products} products • Created {store.created}
+                      {getProductCount(store.id)} products • Created {new Date(store.createdAt).toLocaleDateString()}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold text-(--onyx-stone)">
-                      {store.sales} sales
+                    <p className="text-sm font-medium text-(--onyx-stone)">
+                      {store.templateId}
                     </p>
                   </div>
                 </motion.div>

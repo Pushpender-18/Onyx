@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useWeb3Auth } from '@web3auth/modal/react';
+import { ShopProvider } from '@/context/ShopContext';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
@@ -34,5 +35,9 @@ export default function DashboardLayout({
     return null;
   }
 
-  return <>{children}</>;
+  return (
+    <ShopProvider>
+      {children}
+    </ShopProvider>
+  );
 }
