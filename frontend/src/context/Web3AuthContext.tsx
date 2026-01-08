@@ -2,17 +2,9 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { Web3AuthContextType, User } from '@/types';
+import { ethers } from 'ethers';
 
 const Web3AuthContext = createContext<Web3AuthContextType | undefined>(undefined);
-
-// Dummy user data
-const DUMMY_USER: User = {
-  id: '0x1234567890123456789012345678901234567890',
-  walletAddress: '0x1234567890123456789012345678901234567890',
-  name: 'Demo User',
-  email: 'demo@onyx.com',
-  createdAt: new Date(),
-};
 
 // Constants for localStorage
 const AUTH_STORAGE_KEY = 'onyx_auth_state';
@@ -25,57 +17,148 @@ export const Web3AuthProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [user, setUser] = useState<User | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
 
-  // Initialize auth state from localStorage on mount
+  // Check if MetaMask is installed
+  const isMetaMaskInstalled = (): boolean => {
+    if (typeof window === 'undefined') return false;
+    return Boolean((window as any).ethereum?.isMetaMask);
+  };
+
+  // Initialize auth state from localStorage and check MetaMask connection
   useEffect(() => {
-    const initializeAuthState = () => {
+    const initializeAuthState = async () => {
       try {
+        // First, check localStorage
         const storedAuthState = localStorage.getItem(AUTH_STORAGE_KEY);
         const storedUser = localStorage.getItem(USER_STORAGE_KEY);
         const storedWallet = localStorage.getItem(WALLET_STORAGE_KEY);
 
         if (storedAuthState === 'true' && storedUser && storedWallet) {
           const parsedUser = JSON.parse(storedUser);
-          setIsAuthenticated(true);
-          setUser(parsedUser);
-          setWalletAddress(storedWallet);
-          console.log('✅ Auth state restored from localStorage');
+          
+          // Verify wallet is still connected in MetaMask
+          if (isMetaMaskInstalled()) {
+            try {
+              const ethereum = (window as any).ethereum;
+              const accounts = await ethereum.request({ method: 'eth_accounts' });
+              
+              if (accounts && accounts.length > 0 && accounts[0].toLowerCase() === storedWallet.toLowerCase()) {
+                // Wallet still connected
+                setIsAuthenticated(true);
+                setUser(parsedUser);
+                setWalletAddress(storedWallet);
+                console.log('✅ Auth state restored from localStorage');
+              } else {
+                // Wallet disconnected, clear state
+                console.log('⚠️ Wallet disconnected, clearing auth state');
+                clearAuthState();
+              }
+            } catch (error) {
+              console.error('Error checking MetaMask connection:', error);
+              clearAuthState();
+            }
+          } else {
+            console.log('⚠️ MetaMask not found, clearing auth state');
+            clearAuthState();
+          }
         }
       } catch (error) {
         console.error('Error restoring auth state:', error);
-        // Clear invalid data
-        localStorage.removeItem(AUTH_STORAGE_KEY);
-        localStorage.removeItem(USER_STORAGE_KEY);
-        localStorage.removeItem(WALLET_STORAGE_KEY);
+        clearAuthState();
       } finally {
         setIsLoading(false);
       }
     };
 
     initializeAuthState();
+
+    // Listen for account changes
+    if (isMetaMaskInstalled()) {
+      const ethereum = (window as any).ethereum;
+      
+      ethereum.on('accountsChanged', (accounts: string[]) => {
+        if (accounts.length === 0) {
+          // User disconnected wallet
+          console.log('🔌 Wallet disconnected');
+          logout();
+        } else if (walletAddress && accounts[0].toLowerCase() !== walletAddress.toLowerCase()) {
+          // User switched accounts
+          console.log('🔄 Account switched');
+          logout();
+        }
+      });
+
+      ethereum.on('chainChanged', () => {
+        // Reload page on chain change
+        console.log('🔄 Chain changed, reloading...');
+        window.location.reload();
+      });
+    }
   }, []);
+
+  const clearAuthState = () => {
+    setIsAuthenticated(false);
+    setUser(null);
+    setWalletAddress(null);
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+    localStorage.removeItem(USER_STORAGE_KEY);
+    localStorage.removeItem(WALLET_STORAGE_KEY);
+  };
 
   const login = async () => {
     try {
       setIsLoading(true);
       
-      // Simulate async login
-      await new Promise(resolve => setTimeout(resolve, 500));
+      if (!isMetaMaskInstalled()) {
+        throw new Error('MetaMask is not installed. Please install MetaMask to continue.');
+      }
+
+      const ethereum = (window as any).ethereum;
+      
+      // Request account access
+      const accounts = await ethereum.request({ 
+        method: 'eth_requestAccounts' 
+      });
+
+      if (!accounts || accounts.length === 0) {
+        throw new Error('No accounts found. Please connect your wallet.');
+      }
+
+      const address = accounts[0];
+      
+      // Get additional info
+      const provider = new ethers.BrowserProvider(ethereum);
+      const network = await provider.getNetwork();
+      
+      // Create user object
+      const newUser: User = {
+        id: address,
+        walletAddress: address,
+        name: `${address.substring(0, 6)}...${address.substring(address.length - 4)}`,
+        createdAt: new Date(),
+      };
 
       setIsAuthenticated(true);
-      setUser(DUMMY_USER);
-      setWalletAddress(DUMMY_USER.walletAddress);
+      setUser(newUser);
+      setWalletAddress(address);
 
       // Persist auth state to localStorage
       localStorage.setItem(AUTH_STORAGE_KEY, 'true');
-      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(DUMMY_USER));
-      localStorage.setItem(WALLET_STORAGE_KEY, DUMMY_USER.walletAddress);
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(newUser));
+      localStorage.setItem(WALLET_STORAGE_KEY, address);
       
-      console.log('✅ Dummy user logged in:', DUMMY_USER);
-    } catch (error) {
+      console.log('✅ MetaMask wallet connected:', address);
+      console.log('📡 Network:', network.name, 'Chain ID:', network.chainId.toString());
+    } catch (error: any) {
       console.error('Login error:', error);
-      setIsAuthenticated(false);
-      setUser(null);
-      setWalletAddress(null);
+      clearAuthState();
+      
+      // Provide user-friendly error messages
+      if (error.code === 4001) {
+        throw new Error('Connection rejected. Please approve the connection request in MetaMask.');
+      } else if (error.code === -32002) {
+        throw new Error('Connection request already pending. Please check MetaMask.');
+      }
+      
       throw error;
     } finally {
       setIsLoading(false);
@@ -86,17 +169,7 @@ export const Web3AuthProvider: React.FC<{ children: ReactNode }> = ({ children }
     try {
       setIsLoading(true);
 
-      // Simulate async logout
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      setIsAuthenticated(false);
-      setUser(null);
-      setWalletAddress(null);
-
-      // Clear auth state from localStorage
-      localStorage.removeItem(AUTH_STORAGE_KEY);
-      localStorage.removeItem(USER_STORAGE_KEY);
-      localStorage.removeItem(WALLET_STORAGE_KEY);
+      clearAuthState();
       
       console.log('✅ User logged out successfully');
     } catch (error) {
@@ -108,8 +181,13 @@ export const Web3AuthProvider: React.FC<{ children: ReactNode }> = ({ children }
   };
 
   const getIdToken = async (): Promise<string | null> => {
-    // Return dummy token
-    return isAuthenticated ? 'dummy-id-token' : null;
+    if (!isAuthenticated || !walletAddress) {
+      return null;
+    }
+    
+    // For MetaMask, we can use the wallet address as the token
+    // Or implement signature-based authentication
+    return walletAddress;
   };
 
   const value: Web3AuthContextType = {

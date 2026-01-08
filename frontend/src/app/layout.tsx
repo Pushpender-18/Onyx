@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Web3AuthProvider } from "@/context/Web3AuthContext";
+import { ShopProvider } from "@/context/ShopContext";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 
@@ -32,11 +33,13 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${geist.variable} ${geistMono.variable} antialiased`}>
         <Web3AuthProvider>
-          <Navigation />
-           <main className="min-h-screen bg-var(--onyx-white)">
-            {children}
-          </main>
-          <Footer />
+          <ShopProvider>
+            <Navigation />
+            <main className="min-h-screen bg-var(--onyx-white)">
+              {children}
+            </main>
+            <Footer />
+          </ShopProvider>
         </Web3AuthProvider>
       </body>
     </html>

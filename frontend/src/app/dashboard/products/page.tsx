@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { Plus, Trash, Pencil, Package } from 'phosphor-react';
+import { useShop } from '@/context/ShopContext';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -25,52 +26,70 @@ const itemVariants = {
   },
 };
 
-interface Product {
-  id: string;
+interface ProductForm {
   name: string;
   price: number;
   description: string;
   images: string[];
   category?: string;
+  storeId: string;
 }
 
 export default function ProductsPage() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const { products, stores, isLoading, addProduct, deleteProduct: removeProduct } = useShop();
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState<Partial<Product>>({
+  const [formData, setFormData] = useState<ProductForm>({
     name: '',
     price: 0,
     description: '',
     images: [],
     category: '',
+    storeId: '',
   });
 
-  const handleAddProduct = () => {
-    if (formData.name && formData.price) {
-      setProducts([
-        ...products,
-        {
-          id: Date.now().toString(),
-          name: formData.name,
-          price: formData.price,
-          description: formData.description || '',
-          images: formData.images || [],
-          category: formData.category,
-        },
-      ]);
+  // Set default storeId when stores are loaded
+  useEffect(() => {
+    if (stores.length > 0 && !formData.storeId) {
+      setFormData(prev => ({ ...prev, storeId: stores[0].id }));
+    }
+  }, [stores]);
+
+  const handleAddProduct = async () => {
+    if (!formData.name || !formData.price || !formData.storeId) {
+      alert('Please fill in all required fields and select a store');
+      return;
+    }
+
+    const result = await addProduct(formData.storeId, {
+      name: formData.name,
+      storeId: formData.storeId,
+      price: formData.price,
+      description: formData.description,
+      images: formData.images,
+      metadata: {
+        category: formData.category,
+        tags: [],
+      },
+      isPublished: true,
+    });
+
+    if (result) {
       setFormData({
         name: '',
         price: 0,
         description: '',
         images: [],
         category: '',
+        storeId: stores[0]?.id || '',
       });
       setShowForm(false);
     }
   };
 
   const handleDeleteProduct = (id: string) => {
-    setProducts(products.filter((p) => p.id !== id));
+    if (confirm('Are you sure you want to delete this product?')) {
+      removeProduct(id);
+    }
   };
 
   return (
@@ -104,6 +123,7 @@ export default function ProductsPage() {
       </motion.div>
 
       <div className="container-custom py-8">
+        
         {/* Add Product Form */}
         {showForm && (
           <motion.div
@@ -116,6 +136,23 @@ export default function ProductsPage() {
               Add New Product
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-(--onyx-stone) mb-2">
+                  Select Store *
+                </label>
+                <select
+                  value={formData.storeId}
+                  onChange={(e) => setFormData({ ...formData, storeId: e.target.value })}
+                  className="input-field"
+                >
+                  <option value="">Select a store</option>
+                  {stores.map((store) => (
+                    <option key={store.id} value={store.id}>
+                      {store.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-(--onyx-stone) mb-2">
                   Product Name *
@@ -187,7 +224,14 @@ export default function ProductsPage() {
         )}
 
         {/* Products List */}
-        {products.length > 0 ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-(--onyx-stone) mx-auto mb-4"></div>
+              <p className="text-(--onyx-grey)">Loading products...</p>
+            </div>
+          </div>
+        ) : products.length > 0 ? (
           <motion.div
             variants={containerVariants}
             initial="hidden"
@@ -218,10 +262,10 @@ export default function ProductsPage() {
                         {product.price} MNT
                       </p>
                     </div>
-                    {product.category && (
+                    {product.metadata?.category && (
                       <div>
                         <p className="text-xs text-(--onyx-grey)">Category</p>
-                        <p className="font-medium text-(--onyx-stone)">{product.category}</p>
+                        <p className="font-medium text-(--onyx-stone)">{product.metadata.category}</p>
                       </div>
                     )}
                   </div>
