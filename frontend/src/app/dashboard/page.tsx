@@ -1,15 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
 import { useWeb3AuthUser } from '@web3auth/modal/react';
-import { ProtectedRoute } from '@/components/ProtectedRoute';
-import { motion } from 'framer-motion';
-import Link from 'next/link';
-import { Plus, ShoppingCart, Package, TrendUp, ArrowRight } from 'phosphor-react';
 import { useConnection } from 'wagmi';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useWeb3Auth } from '@/context/Web3AuthContext';
 import { useShop } from '@/context/ShopContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { motion } from 'framer-motion';
@@ -47,9 +41,8 @@ export default function Dashboard() {
   const { userInfo } = useWeb3AuthUser();
   const userName = userInfo?.name ? userInfo.name : "User";
 
-  const [recentStores] = useState<Store[]>([]);
+  // const [recentStores] = useState<Store[]>([]);
   const router = useRouter();
-  const { user, walletAddress } = useWeb3Auth();
   const { stores, products, isLoading, getAllStores, refreshData } = useShop();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -94,7 +87,7 @@ export default function Dashboard() {
               <div>
                 <h1 className="text-4xl font-bold text-(--onyx-stone) mb-2">Dashboard</h1>
                 <p className="text-(--onyx-grey)">
-                  Welcome back, {user?.name || walletAddress?.slice(0, 6)}...
+                  Welcome back, {userName}
                 </p>
               </div>
               <motion.button
