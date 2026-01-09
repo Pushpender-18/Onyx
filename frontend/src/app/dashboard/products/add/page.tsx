@@ -7,6 +7,7 @@ import { ArrowLeft, Upload, FloppyDisk, X, Image as ImageIcon } from 'phosphor-r
 import { useShop } from '@/context/ShopContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import toast from 'react-hot-toast';
+import { uploadImageToIPFS } from '@/lib/ipfs-upload';
 
 export default function AddProductPage() {
   const router = useRouter();
@@ -237,6 +238,23 @@ export default function AddProductPage() {
       console.log('➕ Adding new product to blockchain:', productData);
       console.log('Store ID (contract address):', currentStore.id);
       
+      // Upload image to IPFS first if an image is provided
+      let imageHash = '';
+      if (productData.image) {
+        toast.loading('Uploading image to IPFS...', { id: loadingToast });
+        console.log('📤 Uploading product image to IPFS...');
+        
+        const ipfsResult = await uploadImageToIPFS(productData.image);
+        
+        if (!ipfsResult.success) {
+          throw new Error(ipfsResult.error || 'Failed to upload image to IPFS');
+        }
+        
+        imageHash = ipfsResult.hash;
+        console.log('✅ Image uploaded to IPFS:', imageHash);
+        console.log('🔗 Image URL:', ipfsResult.url);
+      }
+      
       // Update toast to show MetaMask is needed
       toast.loading('Please confirm transaction in MetaMask...', { id: loadingToast });
       
@@ -245,7 +263,7 @@ export default function AddProductPage() {
         storeId: currentStore.id,
         price: price,
         description: productData.description,
-        images: [productData.image || 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop'],
+        images: imageHash ? [imageHash] : [], // Pass IPFS hash instead of base64 data
         metadata: {
           category: productData.category,
           tags: [],
@@ -274,6 +292,8 @@ export default function AddProductPage() {
         errorMessage = 'Insufficient funds for gas';
       } else if (error.message?.includes('Only owner')) {
         errorMessage = 'Only store owner can add products';
+      } else if (error.message?.includes('IPFS')) {
+        errorMessage = error.message; // Show IPFS upload errors
       } else if (error.message) {
         errorMessage = error.message;
       }
