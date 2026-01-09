@@ -7,6 +7,7 @@ import { ShoppingCart, House, Heart } from 'phosphor-react';
 import toast from 'react-hot-toast';
 import { useShop } from '@/context/ShopContext';
 import { Store, Product as StoreProduct } from '@/types';
+import { TEMPLATES, TemplateConfig } from '@/app/dashboard/templateConfig';
 
 interface Product {
   id: string;
@@ -41,6 +42,7 @@ export default function PublishedStorePage() {
   const [storeData, setStoreData] = useState<StoreData | null>(null);
   const [store, setStore] = useState<Store | null>(null);
   const [storeProducts, setStoreProducts] = useState<StoreProduct[]>([]);
+  const [templateConfig, setTemplateConfig] = useState<TemplateConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<string>('home');
@@ -77,6 +79,12 @@ export default function PublishedStorePage() {
         console.log('✅ Store found:', foundStore);
         setStore(foundStore);
 
+        // Load template configuration based on templateId
+        const templateId = foundStore.templateId || 'minimal';
+        const template = TEMPLATES[templateId] || TEMPLATES.minimal;
+        console.log('🎨 Using template:', templateId, template);
+        setTemplateConfig(template);
+
         // Load products for this store
         const storeProds = await getProducts(foundStore.id);
         console.log('📦 Store products:', storeProds);
@@ -88,8 +96,8 @@ export default function PublishedStorePage() {
         const convertedData: StoreData = {
           storeName: foundStore.name,
           heroTitle: foundStore.name,
-          heroSubtitle: foundStore.description || 'Welcome to our store',
-          heroImage: '', // TODO: Add hero image support
+          heroSubtitle: foundStore.description || template.heroSubtitle,
+          heroImage: template.heroImage,
           products: storeProds.map(p => ({
             id: p.id,
             name: p.name,
@@ -100,14 +108,21 @@ export default function PublishedStorePage() {
             badge: p.isPublished ? undefined : 'Draft',
           })),
           categories: ['All', ...categories],
-          primaryColor: foundStore.customization?.primaryColor || '#1a1a1a',
-          secondaryColor: foundStore.customization?.secondaryColor || '#d4af37',
-          accentColor: foundStore.customization?.primaryColor || '#1a1a1a',
-          textColor: '#1a1a1a',
-          aboutText: foundStore.description || '',
+          primaryColor: template.primaryColor,
+          secondaryColor: template.secondaryColor,
+          accentColor: template.accentColor,
+          textColor: template.textColor,
+          aboutText: foundStore.description || template.aboutText,
           contactEmail: 'contact@' + foundStore.name.toLowerCase().replace(/\s+/g, '') + '.com',
           publishedAt: foundStore.createdAt.toISOString(),
         };
+
+        console.log('🎨 Applied template colors:', {
+          primary: template.primaryColor,
+          secondary: template.secondaryColor,
+          accent: template.accentColor,
+          text: template.textColor,
+        });
 
         setStoreData(convertedData);
         setError(null);
@@ -244,12 +259,13 @@ export default function PublishedStorePage() {
       <div
         className="absolute inset-0"
         style={{
-          background: 'linear-gradient(135deg, rgba(10, 14, 39, 0.75) 0%, rgba(26, 31, 58, 0.6) 100%)',
+          background: templateConfig?.heroGradient || 'linear-gradient(135deg, rgba(10, 14, 39, 0.75) 0%, rgba(26, 31, 58, 0.6) 100%)',
         }}
       />
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
         <motion.h2
-          className="text-5xl md:text-6xl font-bold mb-4 leading-tight text-white"
+          className="text-5xl md:text-6xl font-bold mb-4 leading-tight"
+          style={{ color: storeData.accentColor }}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
@@ -257,7 +273,8 @@ export default function PublishedStorePage() {
           {storeData.heroTitle}
         </motion.h2>
         <motion.p
-          className="text-lg md:text-xl mb-8 max-w-2xl font-light text-gray-300"
+          className="text-lg md:text-xl mb-8 max-w-2xl font-light"
+          style={{ color: storeData.accentColor, opacity: 0.9 }}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
@@ -290,7 +307,12 @@ export default function PublishedStorePage() {
           placeholder="Search products..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
+          style={{ 
+            borderColor: storeData.secondaryColor,
+            backgroundColor: storeData.primaryColor,
+            color: storeData.textColor
+          }}
         />
 
         <div className="flex gap-3 overflow-x-auto pb-2">
@@ -376,10 +398,13 @@ export default function PublishedStorePage() {
   // About Section
   const AboutSection = () => (
     <div className="max-w-2xl mx-auto py-12">
-      <h2 className="text-4xl font-bold mb-6 text-gray-900">About {storeData.storeName}</h2>
-      <p className="text-lg text-gray-700 leading-relaxed">{storeData.aboutText}</p>
-      <div className="mt-8 p-6 bg-blue-50 rounded-lg border border-blue-200">
-        <p className="text-gray-900">
+      <h2 className="text-4xl font-bold mb-6" style={{ color: storeData.textColor }}>About {storeData.storeName}</h2>
+      <p className="text-lg leading-relaxed" style={{ color: storeData.textColor }}>{storeData.aboutText}</p>
+      <div className="mt-8 p-6 rounded-lg border" style={{ 
+        backgroundColor: storeData.secondaryColor,
+        borderColor: storeData.accentColor 
+      }}>
+        <p style={{ color: storeData.textColor }}>
           <strong>Contact:</strong> {storeData.contactEmail}
         </p>
       </div>
@@ -400,7 +425,7 @@ export default function PublishedStorePage() {
   };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: storeData.primaryColor }}>
+    <div className="min-h-screen" style={{ backgroundColor: templateConfig?.backgroundColor || storeData.primaryColor }}>
       <Navbar />
 
       <div className="max-w-7xl mx-auto px-6 py-8">
@@ -415,7 +440,7 @@ export default function PublishedStorePage() {
           backgroundColor: storeData.secondaryColor,
         }}
       >
-        <div className="max-w-7xl mx-auto px-6 text-center text-gray-600">
+        <div className="max-w-7xl mx-auto px-6 text-center" style={{ color: storeData.textColor }}>
           <p>© 2025 {storeData.storeName}. All rights reserved.</p>
           <p className="text-sm mt-2">Powered by Onyx Shop</p>
         </div>

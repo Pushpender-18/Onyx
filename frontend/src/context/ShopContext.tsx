@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { ethers } from 'ethers';
 import { Store, Product } from '@/types';
 import * as shopInteraction from '@/lib/shop_interaction';
 
@@ -173,8 +174,9 @@ export function ShopProvider({ children }: { children: ReactNode }) {
             // Now get the actual shop details from the Shop contract
             const shopDetailsResult = await shopInteraction.getShopDetailsFromContract(shopAddress);
             console.log(`  ✅ Got details for ${shopName}:`, shopDetailsResult);
+            console.log(`  🔍 isPublished value:`, shopDetailsResult.isPublished);
             
-            return {
+            const storeData = {
               id: shopAddress, // Use contract address as ID
               userId: shopDetailsResult.owner || '',
               name: shopDetailsResult.shopName || shopName,
@@ -189,10 +191,13 @@ export function ShopProvider({ children }: { children: ReactNode }) {
                   body: 'Inter',
                 },
               },
-              isPublished: true,
+              isPublished: shopDetailsResult.isPublished || false,
               createdAt: new Date(),
               updatedAt: new Date(),
             };
+            
+            console.log(`  📝 Store data to be added:`, storeData);
+            return storeData;
           } catch (err) {
             console.error(`  ❌ Error fetching shop details for ${shopName}:`, err);
             return null;
@@ -247,7 +252,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
             body: 'Inter',
           },
         },
-        isPublished: true,
+        isPublished: shopDetails.isPublished || false,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -365,22 +370,28 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       console.log('📦 Received items:', blockchainItems);
       
       // Convert blockchain data to Product objects
-      const productsData: Product[] = blockchainItems.map((item: any, index: number) => ({
-        id: item.id || index.toString(),
-        storeId: shopAddress,
-        name: item.name || '',
-        description: item.description || '',
-        price: parseFloat(item.price?.toString() || '0'),
-        images: item.ipfsHash || [],
-        metadata: {
-          sku: item.id,
-          category: '',
-          tags: [],
-        },
-        isPublished: item.isActive || false,
-        createdAt: new Date(item.createdAt * 1000 || Date.now()),
-        updatedAt: new Date(item.updatedAt * 1000 || Date.now()),
-      }));
+      const productsData: Product[] = blockchainItems.map((item: any, index: number) => {
+        // Parse timestamps - they are stored as strings representing Unix timestamps in seconds
+        const createdTimestamp = item.createdAt ? parseInt(item.createdAt.toString()) * 1000 : Date.now();
+        const updatedTimestamp = item.updatedAt ? parseInt(item.updatedAt.toString()) * 1000 : Date.now();
+        
+        return {
+          id: item.id || index.toString(),
+          storeId: shopAddress,
+          name: item.name || '',
+          description: item.description || '',
+          price: parseFloat(ethers.formatUnits(item.price || 0, 18)),
+          images: item.ipfsHash || [],
+          metadata: {
+            sku: item.id,
+            category: '',
+            tags: [],
+          },
+          isPublished: item.isActive || false,
+          createdAt: new Date(createdTimestamp),
+          updatedAt: new Date(updatedTimestamp),
+        };
+      });
 
       console.log('✅ Converted products:', productsData);
 

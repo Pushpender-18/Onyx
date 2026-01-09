@@ -5,6 +5,8 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { useShop } from '@/context/ShopContext';
+import { Store as StoreType, Product as BlockchainProduct } from '@/types';
 import {
   ArrowLeft,
   Eye,
@@ -59,7 +61,14 @@ export default function StoreEditor() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const storeName = searchParams.get('storeName') || 'My Store';
+  const storeId = searchParams.get('storeId'); // Get storeId from URL
   const templateId = (searchParams.get('template') || 'minimal') as keyof typeof TEMPLATES;
+  
+  // Use Shop context for blockchain operations
+  const { stores, products: blockchainProducts, addProduct: addProductToBlockchain, getProducts, getStoreByName } = useShop();
+  const [currentStore, setCurrentStore] = useState<StoreType | null>(null);
+  const [loadingStore, setLoadingStore] = useState(false);
+  const [hasLoadedStore, setHasLoadedStore] = useState(false); // Flag to prevent re-loading
   
   // Load the selected template or use default
   const selectedTemplate: TemplateConfig = TEMPLATES[templateId] || DEFAULT_TEMPLATE;
@@ -98,6 +107,66 @@ export default function StoreEditor() {
   const [isHeroImageUpload, setIsHeroImageUpload] = useState(false);
   const [showSavePublishModal, setShowSavePublishModal] = useState(false);
 
+  // Load store and products from blockchain on mount
+  useEffect(() => {
+    const loadStoreData = async () => {
+      // Only load once
+      if (hasLoadedStore || (!storeId && !storeName)) return;
+
+      setLoadingStore(true);
+      try {
+        console.log('🔄 Loading store data for editor...');
+        
+        // Find store by ID or name
+        let foundStore: StoreType | null = null;
+        
+        if (storeId) {
+          foundStore = stores.find(s => s.id === storeId) || null;
+        } else {
+          foundStore = stores.find(s => s.name.toLowerCase() === storeName.toLowerCase()) || null;
+          if (!foundStore) {
+            foundStore = await getStoreByName(storeName);
+          }
+        }
+
+        if (foundStore) {
+          console.log('✅ Store found:', foundStore);
+          setCurrentStore(foundStore);
+
+          // Load products for this store
+          const storeProducts = await getProducts(foundStore.id);
+          console.log('📦 Loaded products:', storeProducts);
+
+          // Convert blockchain products to editor format
+          const convertedProducts: Product[] = storeProducts.map(p => ({
+            id: p.id,
+            name: p.name,
+            price: p.price,
+            image: p.images[0] || 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop',
+            category: p.metadata?.category || storeData.categories[1] || 'General',
+            description: p.description,
+            badge: p.isPublished ? undefined : 'Draft',
+          }));
+
+          setStoreData(prev => ({
+            ...prev,
+            storeName: foundStore!.name,
+            products: convertedProducts,
+          }));
+          
+          setHasLoadedStore(true); // Mark as loaded
+        }
+      } catch (error) {
+        console.error('❌ Error loading store data:', error);
+        toast.error('Failed to load store data');
+      } finally {
+        setLoadingStore(false);
+      }
+    };
+
+    loadStoreData();
+  }, [storeId, storeName]); // Removed 'stores' from dependencies
+
   const filteredProducts = storeData.products.filter((product) => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
@@ -124,15 +193,73 @@ export default function StoreEditor() {
     setCartItems((prev) => prev.filter((item) => item.id !== productId));
   };
 
-  const updateProduct = (updatedProduct: Product) => {
-    setStoreData((prev) => ({
-      ...prev,
-      products: prev.products.map((p) =>
-        p.id === updatedProduct.id ? updatedProduct : p
-      ),
-    }));
-    setEditingProduct(null);
-    setShowProductModal(false);
+  const updateProduct = async (updatedProduct: Product) => {
+    if (!currentStore) {
+      toast.error('Store not loaded. Please refresh the page.');
+      return;
+    }
+
+    try {
+      // Check if this is a new product (not yet in blockchain)
+      const existingProduct = storeData.products.find(p => p.id === updatedProduct.id);
+      const isNewProduct = !existingProduct || existingProduct.id.startsWith('temp-');
+
+      if (isNewProduct) {
+        // Add new product to blockchain
+        console.log('➕ Adding new product to blockchain:', updatedProduct);
+        const newProduct = await addProductToBlockchain(currentStore.id, {
+          name: updatedProduct.name,
+          storeId: currentStore.id,
+          price: updatedProduct.price,
+          description: updatedProduct.description,
+          images: [updatedProduct.image],
+          metadata: {
+            category: updatedProduct.category,
+            tags: [],
+          },
+          isPublished: true,
+        });
+
+        if (newProduct) {
+          // Replace temp product with blockchain product
+          setStoreData((prev) => ({
+            ...prev,
+            products: prev.products.map((p) =>
+              p.id === updatedProduct.id
+                ? {
+                    id: newProduct.id,
+                    name: newProduct.name,
+                    price: newProduct.price,
+                    image: newProduct.images[0] || updatedProduct.image,
+                    category: newProduct.metadata?.category || updatedProduct.category,
+                    description: newProduct.description,
+                  }
+                : p
+            ),
+          }));
+          toast.success('Product added successfully!');
+        } else {
+          toast.error('Failed to add product to blockchain');
+          return;
+        }
+      } else {
+        // Update existing product (currently just local state)
+        // TODO: Add blockchain update function when available
+        setStoreData((prev) => ({
+          ...prev,
+          products: prev.products.map((p) =>
+            p.id === updatedProduct.id ? updatedProduct : p
+          ),
+        }));
+        toast.success('Product updated!');
+      }
+
+      setEditingProduct(null);
+      setShowProductModal(false);
+    } catch (error) {
+      console.error('❌ Error updating product:', error);
+      toast.error('Failed to save product');
+    }
   };
 
   const deleteProduct = (productId: string) => {
@@ -143,61 +270,83 @@ export default function StoreEditor() {
   };
 
   const addNewProduct = () => {
-    const newProduct: Product = {
-      id: Date.now().toString(),
-      name: 'New Product',
-      price: 0,
-      image: 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop',
-      category: storeData.categories[1] || 'General',
-      description: 'Product description',
-    };
-    setEditingProduct(newProduct);
-    setShowProductModal(true);
+    if (!currentStore) {
+      toast.error('Store not loaded. Please refresh the page.');
+      return;
+    }
+    
+    // Navigate to the Add Product page with store info
+    const currentUrl = window.location.pathname + window.location.search;
+    router.push(`/dashboard/products/add?storeId=${currentStore.id}&storeName=${encodeURIComponent(currentStore.name)}&returnUrl=${encodeURIComponent(currentUrl)}`);
   };
 
   // Publish handler
   const handlePublish = async (finalStoreName: string) => {
-    // Simulate publishing delay
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    // Save store data to localStorage
-    const storeDataToSave = {
-      ...storeData,
-      storeName: finalStoreName,
-      publishedAt: new Date().toISOString(),
-    };
-
-    localStorage.setItem(
-      `onyx-store-${finalStoreName}`,
-      JSON.stringify(storeDataToSave)
-    );
-
-    // Save to a list of published stores
-    const publishedStores = JSON.parse(
-      localStorage.getItem('onyx-published-stores') || '[]'
-    );
-    if (
-      !publishedStores.find(
-        (store: any) => store.storeName === finalStoreName
-      )
-    ) {
-      publishedStores.push({
-        storeName: finalStoreName,
-        url: `https://${finalStoreName}.onyx-shop.vercel.app`,
-        publishedAt: new Date().toISOString(),
-      });
-      localStorage.setItem(
-        'onyx-published-stores',
-        JSON.stringify(publishedStores)
-      );
+    if (!currentStore) {
+      toast.error('Store not found. Please refresh the page.');
+      return;
     }
 
-    toast.success(`Store "${finalStoreName}" published successfully!`);
+    const loadingToast = toast.loading('Preparing to publish store...');
 
-    // Redirect to the published store after a short delay
-    setTimeout(() => {
-      window.location.href = `/${finalStoreName}`;
-    }, 2500);
+    try {
+      console.log('📢 Publishing store to blockchain...');
+      console.log('Store address:', currentStore.id);
+      console.log('Store name:', finalStoreName);
+      
+      // Update toast to show MetaMask is needed
+      toast.loading('Please confirm transaction in MetaMask...', { id: loadingToast });
+      
+      // Import the publishShop function
+      const { publishShop } = await import('@/lib/shop_interaction');
+      
+      // Call blockchain function to publish the shop
+      const result = await publishShop(currentStore.id);
+      
+      console.log('✅ Shop published on blockchain:', result);
+      
+      // Save UI customization data to localStorage for quick access
+      const uiCustomization = {
+        storeName: finalStoreName,
+        primaryColor: storeData.primaryColor,
+        secondaryColor: storeData.secondaryColor,
+        accentColor: storeData.accentColor,
+        textColor: storeData.textColor,
+        heroImage: storeData.heroImage,
+        aboutText: storeData.aboutText,
+        contactEmail: storeData.contactEmail,
+        publishedAt: new Date().toISOString(),
+      };
+      
+      localStorage.setItem(
+        `onyx-ui-${currentStore.id}`,
+        JSON.stringify(uiCustomization)
+      );
+
+      toast.success(`Store "${finalStoreName}" is now live!`, { id: loadingToast });
+
+      // Redirect to the published store after a short delay
+      setTimeout(() => {
+        window.location.href = `/${finalStoreName}`;
+      }, 2000);
+    } catch (error: any) {
+      console.error('❌ Error publishing store:', error);
+      
+      let errorMessage = 'Failed to publish store';
+      if (error.message?.includes('rejected')) {
+        errorMessage = 'Transaction rejected';
+      } else if (error.message?.includes('insufficient funds')) {
+        errorMessage = 'Insufficient funds for gas';
+      } else if (error.message?.includes('Only owner')) {
+        errorMessage = 'Only store owner can publish';
+      } else if (error.message?.includes('already published')) {
+        errorMessage = 'Store is already published';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage, { id: loadingToast });
+    }
   };
 
   // Professional Navbar Component
@@ -219,7 +368,7 @@ export default function StoreEditor() {
               const IconComponent = item.icon as any;
               return (
                 <button
-                  key={item.page}
+                  key={item.id}
                   onClick={() => setCurrentPage(item.page)}
                   className="text-sm font-semibold transition-colors hover:opacity-70 flex items-center gap-2"
                   style={{ color: currentPage === item.page ? storeData.accentColor : '#cbd5e1' }}
@@ -1601,7 +1750,7 @@ export default function StoreEditor() {
                 onClick={() => updateProduct(editingProduct)}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700"
               >
-                Save Changes
+                {editingProduct.id.startsWith('temp-') ? 'Add Product' : 'Save Changes'}
               </button>
               <button
                 onClick={() => {

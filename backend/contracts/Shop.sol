@@ -103,4 +103,23 @@ contract Shop {
 		}
 		return itemList;
 	}
+
+	// Publish the shop (make it live)
+	function publishShop() external {
+		require(msg.sender == shopDetails.owner, "Only owner can publish shop");
+		require(!shopDetails.isPublished, "Shop is already published");
+		shopDetails.isPublished = true;
+	}
+
+	// Unpublish the shop (take it offline)
+	function unpublishShop() external {
+		require(msg.sender == shopDetails.owner, "Only owner can unpublish shop");
+		require(shopDetails.isPublished, "Shop is not published");
+		shopDetails.isPublished = false;
+	}
+
+	// Check if shop is published
+	function isShopPublished() external view returns (bool) {
+		return shopDetails.isPublished;
+	}
 }

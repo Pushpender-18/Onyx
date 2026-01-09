@@ -29,4 +29,5 @@ struct ShopDetails {
 	string configuration; // JSON format for shop configuration
 	string thumbnailIpfsHash;
 	address owner;
+	bool isPublished;
 }

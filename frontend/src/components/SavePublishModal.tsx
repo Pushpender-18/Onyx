@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { X, Check, Warning, CheckCircle } from 'phosphor-react';
+import { X, Check, Warning, CheckCircle, Rocket, Globe } from 'phosphor-react';
 import toast from 'react-hot-toast';
 
 interface SavePublishModalProps {
@@ -97,36 +97,40 @@ export const SavePublishModal: React.FC<SavePublishModalProps> = ({
 
   if (!isOpen) return null;
 
-  const storeUrl = `${storeName}.onyx-shop.vercel.app`;
+  const storeUrl = `onyx-shop.vercel.app/${storeName}`;
   const isValid = !errors.storeName && storeName.trim().length >= 3;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
       style={{
-        backdropFilter: 'blur(4px)',
-        backgroundColor: 'rgba(0, 0, 0, 0.3)',
+        backdropFilter: 'blur(8px)',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
       }}
     >
       <motion.div
-        className="bg-white rounded-xl max-w-md w-full shadow-2xl overflow-hidden"
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.9 }}
+        className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden"
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9, y: 20 }}
+        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
       >
         {/* Header */}
-        <div className="bg-linear-to-r from-blue-600 to-blue-700 px-6 py-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="bg-linear-to-r from-gray-900 to-gray-800 px-8 py-8 flex items-center justify-between">
+          <div className="flex items-center gap-4">
             {publishSuccess ? (
-              <CheckCircle size={28} weight="fill" className="text-white" />
+              <CheckCircle size={40} weight="fill" className="text-green-400" />
             ) : (
-              <span className="text-3xl">🚀</span>
+              <Rocket size={40} weight="duotone" className="text-white" />
             )}
             <div>
-              <h2 className="text-xl font-bold text-white">
+              <h2 className="text-2xl font-bold text-white">
                 {publishSuccess ? 'Store Published!' : 'Save & Publish Store'}
               </h2>
-              <p className="text-blue-100 text-sm">
+              <p className="text-gray-300 text-base mt-1">
                 {publishSuccess ? 'Your store is now live' : 'Finalize your store URL'}
               </p>
             </div>
@@ -134,60 +138,71 @@ export const SavePublishModal: React.FC<SavePublishModalProps> = ({
           {!publishSuccess && (
             <button
               onClick={onClose}
-              className="p-2 hover:bg-blue-500 rounded-lg transition-colors"
+              className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
             >
-              <X size={24} className="text-white" weight="bold" />
+              <X size={28} className="text-white" weight="bold" />
             </button>
           )}
         </div>
 
         {/* Content */}
-        <div className="px-6 py-6 space-y-5">
+        <div className="px-8 py-8 space-y-6">
           {publishSuccess ? (
             // Success State
             <motion.div
-              className="space-y-4"
+              className="space-y-5"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
             >
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-                <p className="text-green-800 font-semibold mb-2">Your store is now live!</p>
+              <div className="bg-green-50 border-2 border-green-200 rounded-xl p-6 text-center">
+                <div className="flex items-center justify-center gap-2 mb-3">
+                  <CheckCircle size={24} weight="fill" className="text-green-600" />
+                  <p className="text-green-800 font-bold text-lg">Your store is now live!</p>
+                </div>
                 <a
                   href={`https://${storeUrl}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-green-600 font-mono text-sm hover:underline break-all"
+                  className="text-green-600 font-mono text-base hover:underline break-all inline-block"
                 >
                   https://{storeUrl}
                 </a>
               </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-blue-800 text-sm">
-                  ✓ Store settings saved
-                  <br />✓ Products configured
-                  <br />✓ URL deployed
+              <div className="bg-gray-50 border-2 border-gray-200 rounded-xl p-6">
+                <p className="text-gray-800 text-base space-y-2">
+                  <span className="flex items-center gap-2">
+                    <Check size={20} weight="bold" className="text-green-600" /> Store settings saved
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <Check size={20} weight="bold" className="text-green-600" /> Products configured
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <Check size={20} weight="bold" className="text-green-600" /> URL deployed
+                  </span>
                 </p>
               </div>
 
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                <p className="text-gray-700 text-sm font-semibold mb-2">Share your store:</p>
-                <div className="flex gap-2">
+              <div className="bg-gray-50 border-2 border-gray-200 rounded-xl p-6">
+                <p className="text-gray-700 text-base font-semibold mb-4">Share your store:</p>
+                <div className="flex gap-3">
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(`https://${storeUrl}`);
                       toast.success('URL copied to clipboard!');
                     }}
-                    className="flex-1 px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm font-semibold transition-colors"
+                    className="flex-1 px-4 py-3 bg-gray-200 hover:bg-gray-300 rounded-lg text-base font-semibold transition-colors flex items-center justify-center gap-2"
                   >
+                    <Globe size={18} weight="duotone" />
                     Copy URL
                   </button>
                   <a
                     href={`https://twitter.com/intent/tweet?text=Check%20out%20my%20new%20store%20on%20Onyx:%20https://${storeUrl}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors text-center"
+                    className="flex-1 px-4 py-3 bg-gray-900 text-white rounded-lg text-base font-semibold hover:bg-gray-800 transition-colors text-center flex items-center justify-center gap-2"
                   >
+                    <Rocket size={18} weight="duotone" />
                     Share
                   </a>
                 </div>
@@ -196,18 +211,20 @@ export const SavePublishModal: React.FC<SavePublishModalProps> = ({
           ) : (
             // Input State
             <motion.div
-              className="space-y-4"
+              className="space-y-5"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
             >
               <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-3">
+                <label className="block text-base font-bold text-gray-900 mb-4">
                   Choose Your Store URL
                 </label>
 
                 <div className="relative">
-                  <div className="flex items-center gap-2 px-4 py-3 bg-gray-100 rounded-t-lg border-b border-gray-300">
-                    <span className="text-sm text-gray-600 font-medium">https://</span>
+                  <div className="flex items-center gap-3 px-5 py-4 bg-gray-100 rounded-xl border-2 border-gray-300 focus-within:border-gray-900 transition-colors">
+                    <span className="text-base text-gray-600 font-medium whitespace-nowrap">
+                      https://onyx-shop.vercel.app/
+                    </span>
                     <input
                       type="text"
                       value={storeName}
@@ -215,25 +232,22 @@ export const SavePublishModal: React.FC<SavePublishModalProps> = ({
                       placeholder="mystorename"
                       maxLength={50}
                       disabled={isLoading}
-                      className={`flex-1 bg-transparent text-sm font-medium focus:outline-none placeholder-gray-400 ${
+                      className={`flex-1 bg-transparent text-base font-semibold focus:outline-none placeholder-gray-400 ${
                         errors.storeName ? 'text-red-600' : 'text-gray-900'
                       }`}
                     />
                     {isValid && (
-                      <Check size={20} weight="bold" className="text-green-600" />
+                      <Check size={24} weight="bold" className="text-green-600" />
                     )}
                     {errors.storeName && (
-                      <Warning size={20} weight="bold" className="text-red-600" />
+                      <Warning size={24} weight="bold" className="text-red-600" />
                     )}
-                  </div>
-                  <div className="px-4 py-3 bg-white rounded-b-lg border border-t-0 border-gray-300 text-sm text-gray-600">
-                    <span className="text-gray-600">.onyx-shop.vercel.app</span>
                   </div>
                 </div>
 
                 {/* Character Count */}
-                <div className="mt-2 text-right">
-                  <p className="text-xs text-gray-500">
+                <div className="mt-3 text-right">
+                  <p className="text-sm text-gray-500 font-medium">
                     {storeName.length}/50 characters
                   </p>
                 </div>
@@ -243,10 +257,10 @@ export const SavePublishModal: React.FC<SavePublishModalProps> = ({
                   <motion.div
                     initial={{ opacity: 0, y: -5 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg"
+                    className="mt-3 p-4 bg-red-50 border-2 border-red-200 rounded-xl"
                   >
-                    <p className="text-sm text-red-700 flex items-center gap-2">
-                      <Warning size={16} weight="bold" />
+                    <p className="text-base text-red-700 flex items-center gap-2 font-medium">
+                      <Warning size={20} weight="bold" />
                       {errors.storeName}
                     </p>
                   </motion.div>
@@ -254,29 +268,31 @@ export const SavePublishModal: React.FC<SavePublishModalProps> = ({
               </div>
 
               {/* Preview */}
-              <div className="bg-linear-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-lg p-4">
-                <p className="text-xs text-blue-700 font-semibold mb-2">Your store will be available at:</p>
-                <p className="text-lg font-mono font-bold text-blue-900 break-all">
+              <div className="bg-linear-to-br from-gray-50 to-gray-100 border-2 border-gray-300 rounded-xl p-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <Globe size={20} weight="duotone" className="text-gray-700" />
+                  <p className="text-sm text-gray-700 font-bold">Your store will be available at:</p>
+                </div>
+                <p className="text-xl font-mono font-bold text-gray-900 break-all">
                   https://{storeUrl}
                 </p>
               </div>
 
               {/* Validation Rules */}
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                <p className="text-xs font-semibold text-gray-700 mb-2">URL Requirements:</p>
-                <ul className="space-y-1 text-xs text-gray-600">
-                  <li className={storeName.length >= 3 ? 'text-green-600' : ''}>
-                    ✓ 3-50 characters long
+              <div className="bg-gray-50 border-2 border-gray-200 rounded-xl p-6">
+                <p className="text-sm font-bold text-gray-700 mb-4">URL Requirements:</p>
+                <ul className="space-y-3 text-sm text-gray-600">
+                  <li className={`flex items-center gap-2 ${storeName.length >= 3 && storeName.length <= 50 ? 'text-green-600 font-semibold' : ''}`}>
+                    <span className="text-lg">{storeName.length >= 3 && storeName.length <= 50 ? '✓' : '○'}</span>
+                    3-50 characters long
                   </li>
-                  <li className={/^[a-zA-Z]/.test(storeName) ? 'text-green-600' : ''}>
-                    ✓ Must start with a letter
+                  <li className={`flex items-center gap-2 ${/^[a-zA-Z]/.test(storeName) ? 'text-green-600 font-semibold' : ''}`}>
+                    <span className="text-lg">{/^[a-zA-Z]/.test(storeName) ? '✓' : '○'}</span>
+                    Must start with a letter
                   </li>
-                  <li
-                    className={
-                      /^[a-zA-Z0-9_-]*$/.test(storeName) ? 'text-green-600' : ''
-                    }
-                  >
-                    ✓ Only letters, numbers, dashes & underscores
+                  <li className={`flex items-center gap-2 ${/^[a-zA-Z0-9_-]*$/.test(storeName) && storeName ? 'text-green-600 font-semibold' : ''}`}>
+                    <span className="text-lg">{/^[a-zA-Z0-9_-]*$/.test(storeName) && storeName ? '✓' : '○'}</span>
+                    Only letters, numbers, dashes & underscores
                   </li>
                 </ul>
               </div>
@@ -286,36 +302,36 @@ export const SavePublishModal: React.FC<SavePublishModalProps> = ({
 
         {/* Footer */}
         {!publishSuccess && (
-          <div className="bg-gray-50 px-6 py-4 flex gap-3 border-t border-gray-200">
+          <div className="bg-gray-50 px-8 py-6 flex gap-4 border-t border-gray-200">
             <button
               onClick={onClose}
               disabled={isLoading}
-              className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg font-semibold text-gray-900 hover:bg-gray-100 transition-colors disabled:opacity-50"
+              className="flex-1 px-6 py-3.5 border-2 border-gray-300 rounded-xl font-bold text-base text-gray-900 hover:bg-gray-100 transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               onClick={handlePublish}
               disabled={!isValid || isLoading}
-              className={`flex-1 px-4 py-2.5 rounded-lg font-semibold text-white transition-colors flex items-center justify-center gap-2 ${
+              className={`flex-1 px-6 py-3.5 rounded-xl font-bold text-base text-white transition-colors flex items-center justify-center gap-2 ${
                 isValid && !isLoading
-                  ? 'bg-linear-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 cursor-pointer'
+                  ? 'bg-linear-to-r from-gray-900 to-gray-800 hover:from-gray-800 hover:to-gray-700 cursor-pointer'
                   : 'bg-gray-300 cursor-not-allowed'
               }`}
             >
               {isLoading ? (
                 <>
-                  <motion.span
+                  <motion.div
                     animate={{ rotate: 360 }}
                     transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                   >
-                    ⚙️
-                  </motion.span>
+                    <Rocket size={20} weight="duotone" />
+                  </motion.div>
                   Publishing...
                 </>
               ) : (
                 <>
-                  <span>🚀</span>
+                  <Rocket size={20} weight="duotone" />
                   Publish Store
                 </>
               )}

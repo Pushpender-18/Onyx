@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
@@ -36,6 +37,7 @@ interface ProductForm {
 }
 
 export default function ProductsPage() {
+  const router = useRouter();
   const { products, stores, isLoading, addProduct, deleteProduct: removeProduct } = useShop();
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState<ProductForm>({
@@ -110,7 +112,16 @@ export default function ProductsPage() {
               </p>
             </div>
             <motion.button
-              onClick={() => setShowForm(true)}
+              onClick={() => {
+                // Navigate to add product page with first store or let user select
+                const firstStore = stores[0];
+                if (firstStore) {
+                  router.push(`/dashboard/products/add?storeId=${firstStore.id}&storeName=${encodeURIComponent(firstStore.name)}&returnUrl=/dashboard/products`);
+                } else {
+                  alert('Please create a store first');
+                  router.push('/dashboard/create-store');
+                }
+              }}
               className="btn-primary flex items-center gap-2"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}

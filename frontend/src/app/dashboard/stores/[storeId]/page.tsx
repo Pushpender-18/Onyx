@@ -130,7 +130,7 @@ export default function StoreDetailsPage() {
               View Storefront
             </button>
             <button
-              onClick={() => router.push(`/dashboard/stores/${storeId}/edit`)}
+              onClick={() => router.push(`/dashboard/editor?storeId=${storeId}&storeName=${encodeURIComponent(store.name)}&template=${store.templateId}`)}
               className="px-6 py-3 bg-(--onyx-white) text-(--onyx-stone) border-2 border-(--onyx-stone) rounded-lg hover:bg-(--onyx-grey-lighter) transition-colors flex items-center gap-2"
             >
               <GearSix size={18} weight="bold" />

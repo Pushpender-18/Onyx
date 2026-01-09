@@ -3,6 +3,7 @@
 import React from 'react';
 import { useWeb3Auth } from '@/context/Web3AuthContext';
 import { ShopProvider } from '@/context/ShopContext';
+import { NetworkStatus } from '@/components/NetworkStatus';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
@@ -37,6 +38,9 @@ export default function DashboardLayout({
 
   return (
     <ShopProvider>
+      <div className="container-custom py-4">
+        <NetworkStatus />
+      </div>
       {children}
     </ShopProvider>
   );
