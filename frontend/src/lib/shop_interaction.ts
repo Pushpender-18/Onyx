@@ -266,7 +266,6 @@ async function checkWalletConnection(requireCorrectNetwork: boolean = false) {
 	}
 }
 
-// Note: provider and signer to be fetched during login
 // Returns the Master contract instance
 // Set requireCorrectNetwork to true for write operations, false for read operations
 async function getMasterContract(requireCorrectNetwork: boolean = false) {
@@ -555,4 +554,77 @@ export async function isShopPublished(shopAddress: string): Promise<boolean> {
 		console.error('Error checking if shop is published:', error);
 		return false;
 	}
+}
+
+// Update shop configuration (write operation - requires correct network)
+export async function updateShopConfiguration(shopAddress: string, newConfiguration: string, shopName: string) {
+    try {
+        console.log('🔄 Updating shop configuration at:', shopAddress);
+        
+        // Check if contract exists at this address
+        const provider = await checkWalletConnection(true);
+        const code = await provider.getCode(shopAddress);
+        
+        if (code === '0x') {
+            console.error('❌ No contract found at address:', shopAddress);
+            throw new Error('Store contract not found. The Hardhat node may have been restarted. Please recreate your store.');
+        }
+        
+        const shopContract = await getShopContract(shopAddress, true); // Write operation - require correct network
+        const signer = await provider.getSigner();
+        const callerAddress = await signer.getAddress();
+        
+        // Get shop details to verify ownership
+        const shopDetails = await shopContract.shopDetails();
+        const ownerAddress = shopDetails.owner;
+        
+        console.log('🔑 Caller address:', callerAddress);
+        console.log('👤 Owner address:', ownerAddress);
+        
+        // Verify ownership
+        if (callerAddress.toLowerCase() !== ownerAddress.toLowerCase()) {
+            throw new Error(`Only the shop owner can update configuration. Owner: ${ownerAddress}, You: ${callerAddress}`);
+        }
+        
+        console.log('📝 Sending update configuration transaction to blockchain...');
+        console.log('📋 New configuration:', newConfiguration);
+        
+        const tx = await shopContract.updateShopConfiguration(newConfiguration, shopName);
+        console.log('⏳ Transaction sent. Hash:', tx.hash);
+        console.log('⏳ Waiting for confirmation...');
+        
+        const receipt = await tx.wait();
+        console.log('✅ Transaction confirmed! Block:', receipt.blockNumber);
+        console.log('✅ Shop configuration updated successfully!');
+        
+        return { success: true, txHash: tx.hash, shopAddress };
+    } catch (error: any) {
+        console.error('❌ Error updating shop configuration:', error);
+        
+        // Provide better error messages based on error type
+        if (error.code === 'CALL_EXCEPTION') {
+            if (error.message?.includes('missing revert data')) {
+                throw new Error('Contract not found at this address. The Hardhat node may have been restarted. Please recreate your store.');
+            }
+            throw new Error('Transaction failed. You may not be the owner of this shop.');
+        }
+        
+        if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
+            throw new Error('Transaction rejected by user');
+        }
+        
+        if (error.message?.includes('insufficient funds')) {
+            throw new Error('Insufficient funds to complete transaction');
+        }
+        
+        if (error.message?.includes('Only owner')) {
+            throw new Error('Only the store owner can update the configuration');
+        }
+        
+        if (error.message?.includes('Store contract not found')) {
+            throw error; // Re-throw our custom error with full message
+        }
+        
+        throw error;
+    }
 }

@@ -18,14 +18,29 @@ export interface Store {
   updatedAt: Date;
 }
 
+// export interface StoreCustomization {
+//   primaryColor: string;
+//   secondaryColor: string;
+//   layout: LayoutElement[];
+//   fonts: {
+//     heading: string;
+//     body: string;
+//   };
+// }
+
 export interface StoreCustomization {
+  storeName: string;
+  heroTitle: string;
+  heroSubtitle: string;
+  heroImage: string;
+  products: Product[];
+  categories: string[];
   primaryColor: string;
   secondaryColor: string;
-  layout: LayoutElement[];
-  fonts: {
-    heading: string;
-    body: string;
-  };
+  accentColor: string;
+  textColor?: string;
+  aboutText: string;
+  contactEmail: string;
 }
 
 export interface LayoutElement {

@@ -16,6 +16,7 @@ interface ShopContextType {
   getAllStores: () => Promise<Store[]>;
   getStoreByName: (name: string) => Promise<Store | null>;
   updateStore: (storeId: string, updates: Partial<Store>) => void;
+  updateConfiguration: (shopName: string, shopAddress: string, configuration: string) => Promise<boolean>;
   deleteStore: (storeId: string) => void;
   restoreStore: (storeId: string) => Promise<void>;
   getDeletedStoreIds: () => Set<string>;
@@ -93,15 +94,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
         name: shopDetails.shopName || name,
         description: shopDetails.description || description,
         templateId: shopDetails.shopType || templateId,
-        customization: {
-          primaryColor: '#1a1a1a',
-          secondaryColor: '#d4af37',
-          layout: [],
-          fonts: {
-            heading: 'Inter',
-            body: 'Inter',
-          },
-        },
+        customization: undefined as any,
         isPublished: false,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -243,15 +236,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
         name: shopDetails.shopName || name,
         description: shopDetails.description || '',
         templateId: shopDetails.shopType || 'minimal',
-        customization: {
-          primaryColor: '#1a1a1a',
-          secondaryColor: '#d4af37',
-          layout: shopDetails.configuration ? JSON.parse(shopDetails.configuration) : [],
-          fonts: {
-            heading: 'Inter',
-            body: 'Inter',
-          },
-        },
+        customization: JSON.parse(shopDetails.configuration) || "",
         isPublished: shopDetails.isPublished || false,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -274,6 +259,54 @@ export function ShopProvider({ children }: { children: ReactNode }) {
           : store
       )
     );
+  };
+
+  // Update configuration on blockchain and local state
+  const updateConfiguration = async (shopName: string, shopAddress: string, configuration: string): Promise<boolean> => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      console.log('🔧 Updating configuration for shop:', shopName, shopAddress);
+      
+      // Call blockchain function with shopName
+      await shopInteraction.updateShopConfiguration(shopAddress, configuration, shopName);
+      console.log('✅ Configuration updated on blockchain');
+      
+      // Update local state
+      setStores((prev) =>
+        prev.map((store) =>
+          store.id === shopAddress
+            ? {
+                ...store,
+                customization: {
+                  ...store.customization,
+                  layout: JSON.parse(configuration),
+                },
+                updatedAt: new Date(),
+              }
+            : store
+        )
+      );
+      
+      setIsLoading(false);
+      return true;
+    } catch (err: any) {
+      console.error('Error updating configuration:', err);
+      
+      let errorMessage = 'Failed to update configuration';
+      if (err.message?.includes('Wallet not connected')) {
+        errorMessage = 'Please connect your wallet first';
+      } else if (err.message?.includes('rejected')) {
+        errorMessage = 'Transaction rejected by user';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      setIsLoading(false);
+      return false;
+    }
   };
 
   // Delete store locally
@@ -444,6 +477,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     getAllStores,
     getStoreByName,
     updateStore,
+    updateConfiguration,
     deleteStore,
     restoreStore,
     getDeletedStoreIds,

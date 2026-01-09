@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { useShop } from '@/context/ShopContext';
-import { Store as StoreType, Product as BlockchainProduct } from '@/types';
+import { Store as StoreType, Product, StoreCustomization as StoreData } from '@/types';
 import {
   ArrowLeft,
   Eye,
@@ -27,33 +27,7 @@ import {
 } from 'phosphor-react';
 import { TEMPLATES, DEFAULT_TEMPLATE, type TemplateConfig } from '../templateConfig';
 import { SavePublishModal } from '@/components/SavePublishModal';
-
-interface Product {
-  id: string;
-  name: string;
-  price: number;
-  image: string;
-  category: string;
-  description: string;
-  badge?: string;
-}
-
-interface StoreData {
-  storeName: string;
-  heroTitle: string;
-  heroSubtitle: string;
-  heroImage: string;
-  products: Product[];
-  categories: string[];
-  primaryColor: string;
-  secondaryColor: string;
-  accentColor: string;
-  textColor?: string;
-  aboutText: string;
-  contactEmail: string;
-}
-
-
+import { publishShop, updateShopConfiguration } from '@/lib/shop_interaction';
 
 type PageType = 'home' | 'shop' | 'product' | 'about' | 'contact' | 'cart' | 'checkout';
 
@@ -130,28 +104,28 @@ export default function StoreEditor() {
         }
 
         if (foundStore) {
-          console.log('✅ Store found:', foundStore);
-          setCurrentStore(foundStore);
+          const data = await getStoreByName(foundStore.name);
+          console.log('✅ Store found:', data);
+          setCurrentStore(data);
 
           // Load products for this store
           const storeProducts = await getProducts(foundStore.id);
           console.log('📦 Loaded products:', storeProducts);
 
-          // Convert blockchain products to editor format
-          const convertedProducts: Product[] = storeProducts.map(p => ({
-            id: p.id,
-            name: p.name,
-            price: p.price,
-            image: p.images[0] || 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop',
-            category: p.metadata?.category || storeData.categories[1] || 'General',
-            description: p.description,
-            badge: p.isPublished ? undefined : 'Draft',
-          }));
+          // No conversion needed - storeProducts is already Product[]
+          
+          console.log(data?.customization);
 
           setStoreData(prev => ({
             ...prev,
-            storeName: foundStore!.name,
-            products: convertedProducts,
+            storeName: data?.name || prev.storeName,
+            heroTitle: data?.customization.heroTitle || prev.heroTitle,
+            heroSubtitle: data?.customization.heroSubtitle || prev.heroSubtitle,
+            heroImage: data?.customization.heroImage || prev.heroImage,
+            aboutText: data?.customization.aboutText || prev.aboutText,
+            contactEmail: data?.customization.contactEmail || prev.contactEmail,
+            primaryColor: data?.customization.primaryColor || prev.primaryColor,
+            products: storeProducts, // Use directly instead of converting
           }));
           
           setHasLoadedStore(true); // Mark as loaded
@@ -169,7 +143,7 @@ export default function StoreEditor() {
 
   const filteredProducts = storeData.products.filter((product) => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
+    const matchesCategory = selectedCategory === 'All' || product.metadata?.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
@@ -212,29 +186,17 @@ export default function StoreEditor() {
           storeId: currentStore.id,
           price: updatedProduct.price,
           description: updatedProduct.description,
-          images: [updatedProduct.image],
-          metadata: {
-            category: updatedProduct.category,
-            tags: [],
-          },
+          images: updatedProduct.images,
+          metadata: updatedProduct.metadata,
           isPublished: true,
         });
 
         if (newProduct) {
-          // Replace temp product with blockchain product
+          // Update local state with blockchain product
           setStoreData((prev) => ({
             ...prev,
             products: prev.products.map((p) =>
-              p.id === updatedProduct.id
-                ? {
-                    id: newProduct.id,
-                    name: newProduct.name,
-                    price: newProduct.price,
-                    image: newProduct.images[0] || updatedProduct.image,
-                    category: newProduct.metadata?.category || updatedProduct.category,
-                    description: newProduct.description,
-                  }
-                : p
+              p.id === updatedProduct.id ? newProduct : p
             ),
           }));
           toast.success('Product added successfully!');
@@ -297,30 +259,43 @@ export default function StoreEditor() {
       // Update toast to show MetaMask is needed
       toast.loading('Please confirm transaction in MetaMask...', { id: loadingToast });
       
-      // Import the publishShop function
-      const { publishShop } = await import('@/lib/shop_interaction');
       
       // Call blockchain function to publish the shop
       const result = await publishShop(currentStore.id);
       
-      console.log('✅ Shop published on blockchain:', result);
       
       // Save UI customization data to localStorage for quick access
       const uiCustomization = {
         storeName: finalStoreName,
-        primaryColor: storeData.primaryColor,
-        secondaryColor: storeData.secondaryColor,
-        accentColor: storeData.accentColor,
-        textColor: storeData.textColor,
-        heroImage: storeData.heroImage,
-        aboutText: storeData.aboutText,
-        contactEmail: storeData.contactEmail,
-        publishedAt: new Date().toISOString(),
-      };
+          heroTitle: storeData.heroTitle,
+          heroSubtitle: storeData.heroSubtitle,
+          heroImage: storeData.heroImage,
+          aboutText: storeData.aboutText,
+          contactEmail: storeData.contactEmail,
+          primaryColor: storeData.primaryColor,
+          secondaryColor: storeData.secondaryColor,
+          accentColor: storeData.accentColor,
+          textColor: storeData.textColor,
+          products: storeData.products,
+          categories: storeData.categories,
+        };
       
+      const uiCustomizationString = JSON.stringify(uiCustomization);
+
+      // Update configuration on blockchain
+      console.log('🔧 Updating shop configuration...');
+      const configUpdated = await updateShopConfiguration(currentStore.id, uiCustomizationString, currentStore.name);
+      
+      if (!configUpdated) {
+        throw new Error('Failed to update shop configuration');
+      }
+      
+      console.log('✅ Configuration updated successfully');
+      
+      // Save to localStorage for quick access
       localStorage.setItem(
         `onyx-ui-${currentStore.id}`,
-        JSON.stringify(uiCustomization)
+        uiCustomizationString
       );
 
       toast.success(`Store "${finalStoreName}" is now live!`, { id: loadingToast });
@@ -582,92 +557,98 @@ export default function StoreEditor() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredProducts.map((product) => (
-              <motion.div
-                key={product.id}
-                className="group rounded-xl overflow-hidden transition-all duration-300 cursor-pointer"
-                style={{
-                  backgroundColor: storeData.secondaryColor,
-                  border: '1px solid #4a5568'
-                }}
-                whileHover={{ y: -6, boxShadow: `0 20px 25px -5px ${storeData.accentColor}33` }}
-                onClick={() => {
-                  setSelectedProduct(product);
-                  setCurrentPage('product');
-                }}
-              >
-                <div className="relative overflow-hidden h-64">
-                  <img
-                    src={product.image}
-                    alt={product.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <div
-                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                    style={{
-                      background: `linear-gradient(135deg, ${storeData.accentColor}dd 0%, #0a0e27 100%)`,
-                    }}
-                  >
-                    <button
-                      className="px-6 py-2 bg-white rounded-lg font-semibold text-sm transition-all hover:shadow-lg"
-                      style={{ color: storeData.accentColor }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedProduct(product);
-                        setCurrentPage('product');
+            {filteredProducts.map((product) => {
+              const productImage = product.images?.[0] || 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+              const productCategory = product.metadata?.category || 'General';
+              const productBadge = product.isPublished ? undefined : 'Draft';
+              
+              return (
+                <motion.div
+                  key={product.id}
+                  className="group rounded-xl overflow-hidden transition-all duration-300 cursor-pointer"
+                  style={{
+                    backgroundColor: storeData.secondaryColor,
+                    border: '1px solid #4a5568'
+                  }}
+                  whileHover={{ y: -6, boxShadow: `0 20px 25px -5px ${storeData.accentColor}33` }}
+                  onClick={() => {
+                    setSelectedProduct(product);
+                    setCurrentPage('product');
+                  }}
+                >
+                  <div className="relative overflow-hidden h-64">
+                    <img
+                      src={productImage}
+                      alt={product.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div
+                      className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                      style={{
+                        background: `linear-gradient(135deg, ${storeData.accentColor}dd 0%, #0a0e27 100%)`,
                       }}
                     >
-                      Quick View
-                    </button>
+                      <button
+                        className="px-6 py-2 bg-white rounded-lg font-semibold text-sm transition-all hover:shadow-lg"
+                        style={{ color: storeData.accentColor }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedProduct(product);
+                          setCurrentPage('product');
+                        }}
+                      >
+                        Quick View
+                      </button>
+                    </div>
                   </div>
-                </div>
 
-                <div className="p-5">
-                  <div className="mb-3 flex items-center gap-2">
-                    <span
-                      className="inline-block text-xs font-bold px-3 py-1 rounded-full"
-                      style={{ 
-                        backgroundColor: storeData.accentColor,
-                        color: storeData.primaryColor
-                      }}
-                    >
-                      {product.category}
-                    </span>
-                    {product.badge && (
-                      <span className="text-xs font-bold px-3 py-1 rounded-full" style={{ 
-                        backgroundColor: '#4a5568',
-                        color: '#fbbf24'
-                      }}>
-                        {product.badge}
+                  <div className="p-5">
+                    <div className="mb-3 flex items-center gap-2">
+                      <span
+                        className="inline-block text-xs font-bold px-3 py-1 rounded-full"
+                        style={{ 
+                          backgroundColor: storeData.accentColor,
+                          color: storeData.primaryColor
+                        }}
+                      >
+                        {productCategory}
                       </span>
-                    )}
+                      {productBadge && (
+                        <span className="text-xs font-bold px-3 py-1 rounded-full" style={{ 
+                          backgroundColor: '#4a5568',
+                          color: '#fbbf24'
+                        }}>
+                          {productBadge}
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="text-lg font-bold mb-1" style={{ color: storeData.textColor }}>{product.name}</h3>
+                    <p style={{ color: '#a0aec0' }} className="text-sm mb-4 line-clamp-2">{product.description}</p>
+                    <div className="flex items-center justify-between">
+                      <span
+                        className="text-2xl font-bold"
+                        style={{ color: storeData.accentColor }}
+                      >
+                        ${product.price.toFixed(2)}
+                      </span>
+                      <button
+                        className="px-4 py-2 rounded-lg font-semibold text-sm transition-all hover:shadow-lg"
+                        style={{ 
+                          backgroundColor: storeData.accentColor,
+                          color: storeData.primaryColor
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addToCart(product.id);
+                        }}
+                      >
+                        Add
+                      </button>
+                    </div>
                   </div>
-                  <h3 className="text-lg font-bold mb-1" style={{ color: storeData.textColor }}>{product.name}</h3>
-                  <p style={{ color: '#a0aec0' }} className="text-sm mb-4 line-clamp-2">{product.description}</p>
-                  <div className="flex items-center justify-between">
-                    <span
-                      className="text-2xl font-bold"
-                      style={{ color: storeData.accentColor }}
-                    >
-                      ${product.price.toFixed(2)}
-                    </span>
-                    <button
-                      className="px-4 py-2 rounded-lg font-semibold text-sm transition-all hover:shadow-lg"
-                      style={{ 
-                        backgroundColor: storeData.accentColor,
-                        color: storeData.primaryColor
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        addToCart(product.id);
-                      }}
-                    >
-                      Add
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -677,6 +658,9 @@ export default function StoreEditor() {
   // Product Detail Page
   const ProductDetailPage = () => {
     if (!selectedProduct) return null;
+    
+    const productImage = selectedProduct.images?.[0] || 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+    const productCategory = selectedProduct.metadata?.category || 'General';
 
     return (
       <div className="py-16">
@@ -698,7 +682,7 @@ export default function StoreEditor() {
               animate={{ opacity: 1, x: 0 }}
             >
               <img
-                src={selectedProduct.image}
+                src={productImage}
                 alt={selectedProduct.name}
                 className="w-full h-full object-cover"
               />
@@ -715,7 +699,7 @@ export default function StoreEditor() {
                   className="inline-block text-sm font-bold px-4 py-1 rounded-full text-white mb-4"
                   style={{ backgroundColor: storeData.accentColor }}
                 >
-                  {selectedProduct.category}
+                  {productCategory}
                 </span>
                 <h1 className="text-5xl font-bold mb-2" style={{ color: storeData.accentColor }}>{selectedProduct.name}</h1>
                 <p className="text-lg" style={{ color: '#a0aec0' }}>{selectedProduct.description}</p>
@@ -765,7 +749,7 @@ export default function StoreEditor() {
                 <ul className="space-y-3" style={{ color: '#a0aec0' }}>
                   <li className="flex justify-between">
                     <span>Category:</span>
-                    <strong style={{ color: '#cbd5e1' }}>{selectedProduct.category}</strong>
+                    <strong style={{ color: '#cbd5e1' }}>{productCategory}</strong>
                   </li>
                   <li className="flex justify-between">
                     <span>SKU:</span>
@@ -947,37 +931,41 @@ export default function StoreEditor() {
               {/* Cart Items */}
               <div className="md:col-span-2">
                 <div className="space-y-4">
-                  {cartProducts.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex gap-6 p-6 border rounded-lg"
-                      style={{ borderColor: '#2d3748', backgroundColor: '#1a1f3a' }}
-                    >
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        className="w-24 h-24 object-cover rounded"
-                      />
-                      <div className="flex-1">
-                        <h3 className="text-lg font-bold" style={{ color: '#cbd5e1' }}>{item.name}</h3>
-                        <p style={{ color: '#a0aec0' }}>${item.price.toFixed(2)}</p>
-                        <div className="flex items-center gap-4 mt-4">
-                          <span className="text-sm" style={{ color: '#a0aec0' }}>Qty: {item.quantity}</span>
-                          <button
-                            onClick={() => removeFromCart(item.id)}
-                            className="text-red-500 hover:text-red-700 text-sm font-semibold"
-                          >
-                            Remove
-                          </button>
+                  {cartProducts.map((item) => {
+                    const itemImage = item.images?.[0] || 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+                    
+                    return (
+                      <div
+                        key={item.id}
+                        className="flex gap-6 p-6 border rounded-lg"
+                        style={{ borderColor: '#2d3748', backgroundColor: '#1a1f3a' }}
+                      >
+                        <img
+                          src={itemImage}
+                          alt={item.name}
+                          className="w-24 h-24 object-cover rounded"
+                        />
+                        <div className="flex-1">
+                          <h3 className="text-lg font-bold" style={{ color: '#cbd5e1' }}>{item.name}</h3>
+                          <p style={{ color: '#a0aec0' }}>${item.price.toFixed(2)}</p>
+                          <div className="flex items-center gap-4 mt-4">
+                            <span className="text-sm" style={{ color: '#a0aec0' }}>Qty: {item.quantity}</span>
+                            <button
+                              onClick={() => removeFromCart(item.id)}
+                              className="text-red-500 hover:text-red-700 text-sm font-semibold"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xl font-bold" style={{ color: storeData.accentColor }}>
+                            ${(item.price * item.quantity).toFixed(2)}
+                          </p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-xl font-bold" style={{ color: storeData.accentColor }}>
-                          ${(item.price * item.quantity).toFixed(2)}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1228,173 +1216,162 @@ export default function StoreEditor() {
     );
   };
 
-  // Memoized Image Preview Component - prevents re-renders on slider changes
-  // Ultra-optimized Image Preview with direct DOM manipulation
-  const ImagePreview = React.memo(({ src, scale, offsetX, offsetY }: { src: string; scale: number; offsetX: number; offsetY: number }) => {
-    const imgRef = useRef<HTMLImageElement>(null);
-    
-    useEffect(() => {
-      if (imgRef.current) {
-        // Use direct DOM manipulation for instant visual feedback
-        imgRef.current.style.transform = `scale(${scale}) translate(${offsetX}px, ${offsetY}px)`;
-      }
-    }, [scale, offsetX, offsetY]);
+  // Product Edit Modal
+  const ProductEditModal = () => {
+    if (!editingProduct || !showProductModal) return null;
+
+    const productImage = editingProduct.images?.[0] || '';
+    const productCategory = editingProduct.metadata?.category || '';
 
     return (
-      <div className="w-full bg-gray-100 rounded-lg overflow-hidden border border-gray-300">
-        <div className="relative w-full aspect-square flex items-center justify-center">
-          <img
-            ref={imgRef}
-            src={src}
-            alt="Preview"
-            className="w-full h-full object-cover"
-            style={{
-              transformOrigin: 'center',
-              willChange: 'transform',
-              transition: 'none', // No transition for immediate feedback
-            }}
-          />
-        </div>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backdropFilter: 'blur(4px)', backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
+        <motion.div
+          className="bg-white rounded-lg max-w-2xl w-full max-h-96 overflow-y-auto shadow-2xl"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+        >
+          <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
+            <h2 className="text-2xl font-bold">Edit Product</h2>
+            <button
+              onClick={() => {
+                setShowProductModal(false);
+                setEditingProduct(null);
+              }}
+              className="p-2 hover:bg-gray-100 rounded-lg"
+            >
+              <X size={24} />
+            </button>
+          </div>
+
+          <div className="p-6 space-y-4">
+            <div>
+              <label className="block text-sm font-semibold mb-2">Product Name</label>
+              <input
+                type="text"
+                value={editingProduct.name}
+                onChange={(e) =>
+                  setEditingProduct({ ...editingProduct, name: e.target.value })
+                }
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold mb-2">Description</label>
+              <textarea
+                value={editingProduct.description}
+                onChange={(e) =>
+                  setEditingProduct({ ...editingProduct, description: e.target.value })
+                }
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                rows={3}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold mb-2">Price</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={editingProduct.price}
+                  onChange={(e) =>
+                    setEditingProduct({ ...editingProduct, price: parseFloat(e.target.value) })
+                  }
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold mb-2">Category</label>
+                <select
+                  value={productCategory}
+                  onChange={(e) =>
+                    setEditingProduct({ 
+                      ...editingProduct, 
+                      metadata: { ...editingProduct.metadata, category: e.target.value }
+                    })
+                  }
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                >
+                  {storeData.categories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold mb-3">Product Image</label>
+              <div className="space-y-3">
+                {/* Current Image Preview */}
+                {productImage && (
+                  <div className="w-full bg-gray-100 rounded-lg overflow-hidden border border-gray-300">
+                    <div className="relative w-full aspect-square">
+                      <img
+                        src={productImage}
+                        alt="Product"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Image URL Input */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Image URL</label>
+                  <input
+                    type="text"
+                    value={productImage}
+                    onChange={(e) =>
+                      setEditingProduct({ 
+                        ...editingProduct, 
+                        images: [e.target.value]
+                      })
+                    }
+                    placeholder="https://example.com/image.jpg"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm"
+                  />
+                </div>
+
+                {/* Upload Button */}
+                <button
+                  onClick={() => setShowImageUploadModal(true)}
+                  className="w-full px-4 py-2 border-2 border-dashed border-blue-400 text-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Upload size={18} />
+                  Or Upload from Computer
+                </button>
+
+                <p className="text-xs text-gray-500 text-center">
+                  Recommended: 1:1 aspect ratio (square) • 500x500px
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <button
+                onClick={() => updateProduct(editingProduct)}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700"
+              >
+                {editingProduct.id.startsWith('temp-') ? 'Add Product' : 'Save Changes'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowProductModal(false);
+                  setEditingProduct(null);
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </motion.div>
       </div>
     );
-  });
-  ImagePreview.displayName = 'ImagePreview';
-
-  // Ultra-optimized Crop Controls with local state and debouncing
-  const CropControls = React.memo(({
-    scale,
-    offsetX,
-    offsetY,
-    onScaleChange,
-    onOffsetXChange,
-    onOffsetYChange,
-  }: {
-    scale: number;
-    offsetX: number;
-    offsetY: number;
-    onScaleChange: (value: number) => void;
-    onOffsetXChange: (value: number) => void;
-    onOffsetYChange: (value: number) => void;
-  }) => {
-    const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-    const [localScale, setLocalScale] = useState(scale);
-    const [localOffsetX, setLocalOffsetX] = useState(offsetX);
-    const [localOffsetY, setLocalOffsetY] = useState(offsetY);
-
-    // Sync external state to local state
-    useEffect(() => {
-      setLocalScale(scale);
-    }, [scale]);
-
-    useEffect(() => {
-      setLocalOffsetX(offsetX);
-    }, [offsetX]);
-
-    useEffect(() => {
-      setLocalOffsetY(offsetY);
-    }, [offsetY]);
-
-    // Debounced handler for scale
-    const handleScaleChange = useCallback((newValue: number) => {
-      setLocalScale(newValue);
-      
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-      
-      debounceTimerRef.current = setTimeout(() => {
-        onScaleChange(newValue);
-      }, 50); // 50ms debounce for smooth interaction
-    }, [onScaleChange]);
-
-    // Debounced handler for offset X
-    const handleOffsetXChange = useCallback((newValue: number) => {
-      setLocalOffsetX(newValue);
-      
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-      
-      debounceTimerRef.current = setTimeout(() => {
-        onOffsetXChange(newValue);
-      }, 50);
-    }, [onOffsetXChange]);
-
-    // Debounced handler for offset Y
-    const handleOffsetYChange = useCallback((newValue: number) => {
-      setLocalOffsetY(newValue);
-      
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-      
-      debounceTimerRef.current = setTimeout(() => {
-        onOffsetYChange(newValue);
-      }, 50);
-    }, [onOffsetYChange]);
-
-    // Cleanup debounce timer on unmount
-    useEffect(() => {
-      return () => {
-        if (debounceTimerRef.current) {
-          clearTimeout(debounceTimerRef.current);
-        }
-      };
-    }, []);
-
-    return (
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-semibold mb-2">
-            Zoom Level: {(localScale * 100).toFixed(0)}%
-          </label>
-          <input
-            type="range"
-            min="1"
-            max="3"
-            step="0.05"
-            value={localScale}
-            onChange={(e) => handleScaleChange(parseFloat(e.target.value))}
-            className="w-full cursor-pointer accent-blue-600"
-            style={{ cursor: 'pointer' }}
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-semibold mb-2">
-            Horizontal Position: {localOffsetX}px
-          </label>
-          <input
-            type="range"
-            min="-100"
-            max="100"
-            step="1"
-            value={localOffsetX}
-            onChange={(e) => handleOffsetXChange(parseInt(e.target.value))}
-            className="w-full cursor-pointer accent-blue-600"
-            style={{ cursor: 'pointer' }}
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-semibold mb-2">
-            Vertical Position: {localOffsetY}px
-          </label>
-          <input
-            type="range"
-            min="-100"
-            max="100"
-            step="1"
-            value={localOffsetY}
-            onChange={(e) => handleOffsetYChange(parseInt(e.target.value))}
-            className="w-full cursor-pointer accent-blue-600"
-            style={{ cursor: 'pointer' }}
-          />
-        </div>
-      </div>
-    );
-  });
-  CropControls.displayName = 'CropControls';
+  };
 
   // Image Upload and Crop Modal
   const ImageUploadModal = () => {
@@ -1503,18 +1480,18 @@ export default function StoreEditor() {
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-semibold mb-2">Preview</label>
-                      <ImagePreview src={uploadedImage} scale={cropScale} offsetX={cropOffsetX} offsetY={cropOffsetY} />
+                      {/* <ImagePreview src={uploadedImage} scale={cropScale} offsetX={cropOffsetX} offsetY={cropOffsetY} /> */}
                     </div>
 
                     {/* Crop Controls */}
-                    <CropControls
+                    {/* <CropControls
                       scale={cropScale}
                       offsetX={cropOffsetX}
                       offsetY={cropOffsetY}
                       onScaleChange={handleCropScaleChange}
                       onOffsetXChange={handleCropOffsetXChange}
                       onOffsetYChange={handleCropOffsetYChange}
-                    />
+                    /> */}
 
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                       <p className="text-sm text-blue-800">
@@ -1528,7 +1505,7 @@ export default function StoreEditor() {
                           if (editingProduct) {
                             setEditingProduct({
                               ...editingProduct,
-                              image: uploadedImage,
+                              images: [uploadedImage],
                             });
                           }
                           setShowImageUploadModal(false);
@@ -1564,12 +1541,12 @@ export default function StoreEditor() {
                   <input
                     type="url"
                     placeholder="https://example.com/image.jpg"
-                    defaultValue={editingProduct?.image || ''}
+                    defaultValue={editingProduct?.images?.[0] || ''}
                     onChange={(e) => {
                       if (editingProduct) {
                         setEditingProduct({
                           ...editingProduct,
-                          image: e.target.value,
+                          images: [e.target.value],
                         });
                       }
                     }}
@@ -1577,13 +1554,13 @@ export default function StoreEditor() {
                   />
                 </div>
 
-                {editingProduct?.image && (
+                {editingProduct?.images?.[0] && (
                   <div>
                     <label className="block text-sm font-semibold mb-2">Preview</label>
                     <div className="w-full bg-gray-100 rounded-lg overflow-hidden border border-gray-300">
                       <div className="relative w-full aspect-square">
                         <img
-                          src={editingProduct.image}
+                          src={editingProduct.images[0]}
                           alt="Preview"
                           className="w-full h-full object-cover"
                           onError={() => {
@@ -1614,154 +1591,6 @@ export default function StoreEditor() {
                 </div>
               </div>
             )}
-          </div>
-        </motion.div>
-      </div>
-    );
-  };
-
-  // Product Edit Modal
-  const ProductEditModal = () => {
-    if (!editingProduct || !showProductModal) return null;
-
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backdropFilter: 'blur(4px)', backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
-        <motion.div
-          className="bg-white rounded-lg max-w-2xl w-full max-h-96 overflow-y-auto shadow-2xl"
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-        >
-          <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
-            <h2 className="text-2xl font-bold">Edit Product</h2>
-            <button
-              onClick={() => {
-                setShowProductModal(false);
-                setEditingProduct(null);
-              }}
-              className="p-2 hover:bg-gray-100 rounded-lg"
-            >
-              <X size={24} />
-            </button>
-          </div>
-
-          <div className="p-6 space-y-4">
-            <div>
-              <label className="block text-sm font-semibold mb-2">Product Name</label>
-              <input
-                type="text"
-                value={editingProduct.name}
-                onChange={(e) =>
-                  setEditingProduct({ ...editingProduct, name: e.target.value })
-                }
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold mb-2">Description</label>
-              <textarea
-                value={editingProduct.description}
-                onChange={(e) =>
-                  setEditingProduct({ ...editingProduct, description: e.target.value })
-                }
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                rows={3}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold mb-2">Price</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={editingProduct.price}
-                  onChange={(e) =>
-                    setEditingProduct({ ...editingProduct, price: parseFloat(e.target.value) })
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold mb-2">Category</label>
-                <select
-                  value={editingProduct.category}
-                  onChange={(e) =>
-                    setEditingProduct({ ...editingProduct, category: e.target.value })
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                >
-                  {storeData.categories.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold mb-3">Product Image</label>
-              <div className="space-y-3">
-                {/* Current Image Preview */}
-                {editingProduct.image && (
-                  <div className="w-full bg-gray-100 rounded-lg overflow-hidden border border-gray-300">
-                    <div className="relative w-full aspect-square">
-                      <img
-                        src={editingProduct.image}
-                        alt="Product"
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Image URL Input */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Image URL</label>
-                  <input
-                    type="text"
-                    value={editingProduct.image}
-                    onChange={(e) =>
-                      setEditingProduct({ ...editingProduct, image: e.target.value })
-                    }
-                    placeholder="https://example.com/image.jpg"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm"
-                  />
-                </div>
-
-                {/* Upload Button */}
-                <button
-                  onClick={() => setShowImageUploadModal(true)}
-                  className="w-full px-4 py-2 border-2 border-dashed border-blue-400 text-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition-colors flex items-center justify-center gap-2"
-                >
-                  <Upload size={18} />
-                  Or Upload from Computer
-                </button>
-
-                <p className="text-xs text-gray-500 text-center">
-                  Recommended: 1:1 aspect ratio (square) • 500x500px
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-3 pt-4">
-              <button
-                onClick={() => updateProduct(editingProduct)}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700"
-              >
-                {editingProduct.id.startsWith('temp-') ? 'Add Product' : 'Save Changes'}
-              </button>
-              <button
-                onClick={() => {
-                  setShowProductModal(false);
-                  setEditingProduct(null);
-                }}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-            </div>
           </div>
         </motion.div>
       </div>
@@ -2093,7 +1922,7 @@ export default function StoreEditor() {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">About Text</label>
+              <label className="block text-sm font-semibold mb-3">About Text</label>
               <textarea
                 value={storeData.aboutText}
                 onChange={(e) => updateStoreData({ aboutText: e.target.value })}
@@ -2103,7 +1932,7 @@ export default function StoreEditor() {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">Contact Email</label>
+              <label className="block text-sm font-semibold mb-3">Contact Email</label>
               <input
                 type="email"
                 value={storeData.contactEmail}
@@ -2113,7 +1942,7 @@ export default function StoreEditor() {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-3">Colors</label>
+              <label className="block text-sm font-semibold mb-3">Colors</label>
               <div className="space-y-3">
                 {[
                   { label: 'Primary Color', key: 'primaryColor' as const },
@@ -2162,47 +1991,52 @@ export default function StoreEditor() {
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {storeData.products.map((product) => (
-              <motion.div
-                key={product.id}
-                className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors group"
-                whileHover={{ scale: 1.02 }}
-              >
-                <div className="flex gap-3 items-start">
-                  <img
-                    src={product.image}
-                    alt={product.name}
-                    className="w-12 h-12 rounded object-cover shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-semibold text-gray-900 truncate">
-                      {product.name}
-                    </h4>
-                    <p className="text-xs text-gray-500">${product.price.toFixed(2)}</p>
-                    <span className="text-xs text-gray-600">{product.category}</span>
+            {storeData.products.map((product) => {
+              const productImage = product.images?.[0] || 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+              const productCategory = product.metadata?.category || 'General';
+              
+              return (
+                <motion.div
+                  key={product.id}
+                  className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors group"
+                  whileHover={{ scale: 1.02 }}
+                >
+                  <div className="flex gap-3 items-start">
+                    <img
+                      src={productImage}
+                      alt={product.name}
+                      className="w-12 h-12 rounded object-cover shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-sm font-semibold text-gray-900 truncate">
+                        {product.name}
+                      </h4>
+                      <p className="text-xs text-gray-500">${product.price.toFixed(2)}</p>
+                      <span className="text-xs text-gray-600">{productCategory}</span>
+                    </div>
+                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => {
+                          setEditingProduct(product);
+                          setShowProductModal(true);
+                        }}
+                        className="p-1 hover:bg-blue-100 text-blue-600 rounded"
+                        title="Edit"
+                      >
+                        <PencilSimple size={16} weight="bold" />
+                      </button>
+                      <button
+                        onClick={() => deleteProduct(product.id)}
+                        className="p-1 hover:bg-red-100 text-red-600 rounded"
+                        title="Delete"
+                      >
+                        <Trash size={16} />
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => {
-                        setEditingProduct(product);
-                        setShowProductModal(true);
-                      }}
-                      className="p-1 hover:bg-blue-100 text-blue-600 rounded"
-                      title="Edit"
-                    >
-                      <PencilSimple size={16} weight="bold" />
-                    </button>
-                    <button
-                      onClick={() => deleteProduct(product.id)}
-                      className="p-1 hover:bg-red-100 text-red-600 rounded"
-                      title="Delete"
-                    >
-                      <Trash size={16} />
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              );
+            })}
           </div>
         </div>
       </div>

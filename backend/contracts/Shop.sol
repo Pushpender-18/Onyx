@@ -17,6 +17,18 @@ contract Shop {
 		orderCount = 0;
 	}
 
+	// Update Shop UI Configuration
+	function updateShopConfiguration(string memory _newConfig, string memory _shopName) external {
+		require(msg.sender == shopDetails.owner, "Only owner can update shop configuration"); // Access control [Only the shop owner can update configuration]
+		shopDetails.configuration = _newConfig;
+		shopDetails.shopName = _shopName;
+	}
+
+	// Return shop details
+	function getShopDetails() external view returns (ShopDetails memory) {
+		return shopDetails;
+	}
+
 	// Adds a new product to the shop.
 	function addProduct(Item memory _item) external {
 		require(msg.sender == shopDetails.owner, "Only owner can add products"); // Access control [Only the shop owner can add products]
