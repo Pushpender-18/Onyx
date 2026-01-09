@@ -2,10 +2,8 @@
 
 import React from 'react';
 import { FaWallet, FaStore, FaRocket } from 'react-icons/fa';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { useWeb3Auth} from '@/context/Web3AuthContext';
 import {
   Cube,
   ShoppingCart,

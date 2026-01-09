@@ -15,6 +15,8 @@ import {
   FiSettings,
 } from 'react-icons/fi';
 import { useShop } from '@/context/ShopContext';
+import { useWeb3Auth } from '@web3auth/modal/react';
+import { ethers } from 'ethers';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -58,6 +60,8 @@ export default function CreateStore() {
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [storeName, setStoreName] = useState('');
   const [storeDescription, setStoreDescription] = useState('');
+  const {provider} = useWeb3Auth();
+  const web3Provider = new ethers.BrowserProvider(provider as any);
 
   const handleCreateStore = async () => {
     if (!selectedTemplate || !storeName) {
@@ -72,12 +76,16 @@ export default function CreateStore() {
         layout: [],
       });
 
+      const chainId = (await web3Provider.getNetwork()).chainId;
+      console.log('Connected to chain ID:', chainId);
+      const signer = await web3Provider.getSigner();
       // Create store via blockchain and update local state
       const result = await createShopStore(
         storeName,
         selectedTemplate,
         storeDescription,
-        configuration
+        configuration, 
+        signer
       );
 
       if (result) {

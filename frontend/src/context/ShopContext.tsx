@@ -11,22 +11,22 @@ interface ShopContextType {
   error: string | null;
   
   // Store operations
-  createStore: (name: string, templateId: string, description: string, configuration: string) => Promise<Store | null>;
-  getAllStores: () => Promise<Store[]>;
-  getStoreByName: (name: string) => Promise<Store | null>;
+  createStore: (name: string, templateId: string, description: string, configuration: string, signer: any) => Promise<Store | null>;
+  getAllStores: (signer: any) => Promise<Store[]>;
+  getStoreByName: (name: string, signer: any) => Promise<Store | null>;
   updateStore: (storeId: string, updates: Partial<Store>) => void;
   deleteStore: (storeId: string) => void;
-  restoreStore: (storeId: string) => Promise<void>;
+  restoreStore: (storeId: string, signer: any) => Promise<void>;
   getDeletedStoreIds: () => Set<string>;
   
   // Product operations
-  addProduct: (shopAddress: string, product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Product | null>;
-  getProducts: (shopAddress: string) => Promise<Product[]>;
+  addProduct: (shopAddress: string, product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>, signer: any) => Promise<Product | null>;
+  getProducts: (shopAddress: string, signer: any) => Promise<Product[]>;
   updateProduct: (productId: string, updates: Partial<Product>) => void;
   deleteProduct: (productId: string) => void;
   
   // Utility
-  refreshData: () => Promise<void>;
+  refreshData: (signer: any) => Promise<void>;
 }
 
 const ShopContext = createContext<ShopContextType | undefined>(undefined);
@@ -66,7 +66,8 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     name: string,
     templateId: string,
     description: string,
-    configuration: string
+    configuration: string,
+    signer: any,
   ): Promise<Store | null> => {
     setIsLoading(true);
     setError(null);
@@ -74,15 +75,15 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     try {
       console.log('🔨 Creating shop on blockchain:', name);
       // Call blockchain function
-      const response = await shopInteraction.createShop(name, templateId, description, configuration);
+      const response = await shopInteraction.createShop(name, templateId, description, configuration, signer);
       console.log('✅ Shop created, response:', response);
       
       // Get the shop address
-      const shopAddress = await shopInteraction.getShopDetails(name);
+      const shopAddress = await shopInteraction.getShopDetails(name, signer);
       console.log('📍 Shop address:', shopAddress);
       
       // Get the full shop details from the contract
-      const shopDetails = await shopInteraction.getShopDetailsFromContract(shopAddress);
+      const shopDetails = await shopInteraction.getShopDetailsFromContract(shopAddress, signer);
       console.log('📦 Shop details:', shopDetails);
       
       // Create store object for local state
@@ -134,13 +135,13 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   };
 
   // Get all stores from blockchain and sync with local state
-  const getAllStores = async (): Promise<Store[]> => {
+  const getAllStores = async (signer: any): Promise<Store[]> => {
     setIsLoading(true);
     setError(null);
 
     try {
       console.log('🔍 Fetching all shops from blockchain...');
-      const shopNames = await shopInteraction.getAllShops();
+      const shopNames = await shopInteraction.getAllShops(signer);
       console.log('📦 Received shop names:', shopNames);
       
       if (!shopNames || shopNames.length === 0) {
@@ -161,7 +162,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
           try {
             console.log(`  📍 Fetching address for: ${shopName}`);
             // getShopDetails actually calls getShopByName which returns the shop address
-            const shopAddress = await shopInteraction.getShopDetails(shopName);
+            const shopAddress = await shopInteraction.getShopDetails(shopName, signer);
             console.log(`  📍 Shop address: ${shopAddress}`);
             
             // Skip if this store was deleted by the user
@@ -171,7 +172,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
             }
             
             // Now get the actual shop details from the Shop contract
-            const shopDetailsResult = await shopInteraction.getShopDetailsFromContract(shopAddress);
+            const shopDetailsResult = await shopInteraction.getShopDetailsFromContract(shopAddress, signer);
             console.log(`  ✅ Got details for ${shopName}:`, shopDetailsResult);
             
             return {
@@ -225,12 +226,12 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   };
 
   // Get store by name
-  const getStoreByName = async (name: string): Promise<Store | null> => {
+  const getStoreByName = async (name: string, signer: any): Promise<Store | null> => {
     try {
       // First get the shop address
-      const shopAddress = await shopInteraction.getShopDetails(name);
+      const shopAddress = await shopInteraction.getShopDetails(name, signer);
       // Then get the shop details from the contract
-      const shopDetails = await shopInteraction.getShopDetailsFromContract(shopAddress);
+      const shopDetails = await shopInteraction.getShopDetailsFromContract(shopAddress, signer);
       
       const store: Store = {
         id: shopAddress,
@@ -288,7 +289,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   };
 
   // Restore a previously deleted store
-  const restoreStore = async (storeId: string): Promise<void> => {
+  const restoreStore = async (storeId: string, signer: any): Promise<void> => {
     console.log('♻️ Restoring store:', storeId);
     
     // Remove from deleted stores list in localStorage
@@ -298,13 +299,14 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     console.log('💾 Store removed from deleted list in localStorage');
     
     // Reload all stores to get the restored store
-    await getAllStores();
+    await getAllStores(signer);
   };
 
   // Add product (blockchain + local state)
   const addProduct = async (
     shopAddress: string,
-    product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>
+    product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>,
+    signer: any
   ): Promise<Product | null> => {
     setIsLoading(true);
     setError(null);
@@ -317,7 +319,8 @@ export function ShopProvider({ children }: { children: ReactNode }) {
         product.price,
         100, // Default stock
         product.description,
-        product.images
+        product.images,
+        signer
       );
 
       // Create product object for local state
@@ -355,13 +358,13 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   };
 
   // Get products from blockchain and sync with local state
-  const getProducts = useCallback(async (shopAddress: string): Promise<Product[]> => {
+  const getProducts = useCallback(async (shopAddress: string, signer: any): Promise<Product[]> => {
     setIsLoading(true);
     setError(null);
 
     try {
       console.log('📦 Fetching products for shop:', shopAddress);
-      const blockchainItems = await shopInteraction.getItemsFromShop(shopAddress);
+      const blockchainItems = await shopInteraction.getItemsFromShop(shopAddress, signer);
       console.log('📦 Received items:', blockchainItems);
       
       // Convert blockchain data to Product objects
@@ -420,8 +423,8 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   };
 
   // Refresh all data from blockchain
-  const refreshData = async () => {
-    await getAllStores();
+  const refreshData = async (signer: any) => {
+    await getAllStores(signer);
   };
 
   const value: ShopContextType = {
