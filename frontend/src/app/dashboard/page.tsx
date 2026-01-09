@@ -234,6 +234,8 @@ export default function Dashboard() {
                   variants={itemVariants}
                   onClick={() => router.push(`/dashboard/stores/${store.id}`)}
                   className="flex items-start justify-between p-4 bg-(--onyx-grey-lighter)/30 rounded-lg hover:bg-(--onyx-grey-lighter)/50 transition-colors cursor-pointer group"
+                  initial={{opacity: 0}}
+                  whileInView={{opacity: 1}}
                   whileHover={{ x: 5 }}
                 >
                   <div>
