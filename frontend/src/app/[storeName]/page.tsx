@@ -55,16 +55,19 @@ export default function PublishedStorePage() {
   useEffect(() => {
     const loadStore = async () => {
       setLoading(true);
-      try {
-        console.log('🏪 Loading storefront for:', storeName);
-        
+      try {        
         // First try to find in loaded stores
         let foundStore = stores.find(s => s.name.toLowerCase() === storeName.toLowerCase());
         
         // If not found, fetch from blockchain
         if (!foundStore) {
           console.log('📡 Store not in cache, fetching from blockchain...');
-          const fetchedStore = await getStoreByName(storeName);
+          const filteredStoreName = storeName.replaceAll('%20', ' ');
+          console.log('🔍 Fetching store with name:', filteredStoreName);
+          const fetchedStore = await getStoreByName(filteredStoreName);
+          
+          console.log('📡 Fetched store from blockchain:', storeName);
+
           if (fetchedStore) {
             foundStore = fetchedStore;
           }
