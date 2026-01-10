@@ -4,8 +4,7 @@ import "./globals.css";
 import { Toaster } from "react-hot-toast";
 import { Web3AuthProvider } from "@/context/Web3AuthContext";
 import { ShopProvider } from "@/context/ShopContext";
-import Navigation from "@/components/Navigation";
-import Footer from "@/components/Footer";
+import LayoutWrapper from "@/components/LayoutWrapper";
 
 const geist = Geist({
   variable: "--font-geist-sans",
@@ -62,11 +61,9 @@ export default function RootLayout({
         />
         <Web3AuthProvider>
           <ShopProvider>
-            <Navigation />
-            <main className="min-h-screen bg-var(--onyx-white)">
+            <LayoutWrapper>
               {children}
-            </main>
-            <Footer />
+            </LayoutWrapper>
           </ShopProvider>
         </Web3AuthProvider>
       </body>

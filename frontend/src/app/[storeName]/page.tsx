@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { ShoppingCart, House, Heart } from 'phosphor-react';
 import toast from 'react-hot-toast';
 import { useShop } from '@/context/ShopContext';
-import { Store, Product as StoreProduct } from '@/types';
+import { Store, StoreCustomization ,Product as StoreProduct } from '@/types';
 import { TEMPLATES, TemplateConfig } from '@/app/dashboard/templateConfig';
 
 interface Product {
@@ -69,6 +69,7 @@ export default function PublishedStorePage() {
           console.log('📡 Fetched store from blockchain:', storeName);
 
           if (fetchedStore) {
+            console.log('✅ Store found on blockchain:', fetchedStore);
             foundStore = fetchedStore;
           }
         }
@@ -98,8 +99,8 @@ export default function PublishedStorePage() {
         
         const convertedData: StoreData = {
           storeName: foundStore.name,
-          heroTitle: foundStore.name,
-          heroSubtitle: foundStore.description || template.heroSubtitle,
+          heroTitle: foundStore.customization.heroTitle,
+          heroSubtitle: foundStore.customization.heroSubtitle,
           heroImage: template.heroImage,
           products: storeProds.map(p => ({
             id: p.id,
@@ -111,11 +112,11 @@ export default function PublishedStorePage() {
             badge: p.isPublished ? undefined : 'Draft',
           })),
           categories: ['All', ...categories],
-          primaryColor: template.primaryColor,
-          secondaryColor: template.secondaryColor,
-          accentColor: template.accentColor,
-          textColor: template.textColor,
-          aboutText: foundStore.description || template.aboutText,
+          primaryColor: foundStore.customization.primaryColor || template.primaryColor,
+          secondaryColor: foundStore.customization.secondaryColor || template.secondaryColor,
+          accentColor: foundStore.customization.accentColor || template.accentColor,
+          textColor: foundStore.customization.textColor || template.textColor,
+          aboutText: foundStore.customization.aboutText || template.aboutText,
           contactEmail: 'contact@' + foundStore.name.toLowerCase().replace(/\s+/g, '') + '.com',
           publishedAt: foundStore.createdAt.toISOString(),
         };
