@@ -63,10 +63,6 @@ export const SavePublishModal: React.FC<SavePublishModalProps> = ({
   };
 
   const handlePublish = async () => {
-    if (!validateStoreName(storeName)) {
-      return;
-    }
-
     setIsLoading(true);
 
     try {
@@ -160,7 +156,7 @@ export const SavePublishModal: React.FC<SavePublishModalProps> = ({
                   <p className="text-green-800 font-bold text-lg">Your store is now live!</p>
                 </div>
                 <a
-                  href={`https://${storeUrl}`}
+                  href={`https://${storeUrl.replaceAll(" ",  "%20")}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-green-600 font-mono text-base hover:underline break-all inline-block"
@@ -215,58 +211,6 @@ export const SavePublishModal: React.FC<SavePublishModalProps> = ({
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
             >
-              <div>
-                <label className="block text-base font-bold text-gray-900 mb-4">
-                  Choose Your Store URL
-                </label>
-
-                <div className="relative">
-                  <div className="flex items-center gap-3 px-5 py-4 bg-gray-100 rounded-xl border-2 border-gray-300 focus-within:border-gray-900 transition-colors">
-                    <span className="text-base text-gray-600 font-medium whitespace-nowrap">
-                      https://onyx-shop.vercel.app/
-                    </span>
-                    <input
-                      type="text"
-                      value={storeName}
-                      onChange={handleNameChange}
-                      placeholder="mystorename"
-                      maxLength={50}
-                      disabled={isLoading}
-                      className={`flex-1 bg-transparent text-base font-semibold focus:outline-none placeholder-gray-400 ${
-                        errors.storeName ? 'text-red-600' : 'text-gray-900'
-                      }`}
-                    />
-                    {isValid && (
-                      <Check size={24} weight="bold" className="text-green-600" />
-                    )}
-                    {errors.storeName && (
-                      <Warning size={24} weight="bold" className="text-red-600" />
-                    )}
-                  </div>
-                </div>
-
-                {/* Character Count */}
-                <div className="mt-3 text-right">
-                  <p className="text-sm text-gray-500 font-medium">
-                    {storeName.length}/50 characters
-                  </p>
-                </div>
-
-                {/* Error Message */}
-                {errors.storeName && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mt-3 p-4 bg-red-50 border-2 border-red-200 rounded-xl"
-                  >
-                    <p className="text-base text-red-700 flex items-center gap-2 font-medium">
-                      <Warning size={20} weight="bold" />
-                      {errors.storeName}
-                    </p>
-                  </motion.div>
-                )}
-              </div>
-
               {/* Preview */}
               <div className="bg-linear-to-br from-gray-50 to-gray-100 border-2 border-gray-300 rounded-xl p-6">
                 <div className="flex items-center gap-2 mb-3">
@@ -274,27 +218,8 @@ export const SavePublishModal: React.FC<SavePublishModalProps> = ({
                   <p className="text-sm text-gray-700 font-bold">Your store will be available at:</p>
                 </div>
                 <p className="text-xl font-mono font-bold text-gray-900 break-all">
-                  https://{storeUrl}
+                  https://{storeUrl.replaceAll(" ",  "%20")}
                 </p>
-              </div>
-
-              {/* Validation Rules */}
-              <div className="bg-gray-50 border-2 border-gray-200 rounded-xl p-6">
-                <p className="text-sm font-bold text-gray-700 mb-4">URL Requirements:</p>
-                <ul className="space-y-3 text-sm text-gray-600">
-                  <li className={`flex items-center gap-2 ${storeName.length >= 3 && storeName.length <= 50 ? 'text-green-600 font-semibold' : ''}`}>
-                    <span className="text-lg">{storeName.length >= 3 && storeName.length <= 50 ? '✓' : '○'}</span>
-                    3-50 characters long
-                  </li>
-                  <li className={`flex items-center gap-2 ${/^[a-zA-Z]/.test(storeName) ? 'text-green-600 font-semibold' : ''}`}>
-                    <span className="text-lg">{/^[a-zA-Z]/.test(storeName) ? '✓' : '○'}</span>
-                    Must start with a letter
-                  </li>
-                  <li className={`flex items-center gap-2 ${/^[a-zA-Z0-9_-]*$/.test(storeName) && storeName ? 'text-green-600 font-semibold' : ''}`}>
-                    <span className="text-lg">{/^[a-zA-Z0-9_-]*$/.test(storeName) && storeName ? '✓' : '○'}</span>
-                    Only letters, numbers, dashes & underscores
-                  </li>
-                </ul>
               </div>
             </motion.div>
           )}
