@@ -384,37 +384,28 @@ export default function StoreEditor() {
         }}
       />
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
-        <motion.h2
+        <h2
           className="text-5xl md:text-6xl font-bold mb-4 leading-tight"
           style={{ color: storeData.textColor }}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
+          >
           {storeData.heroTitle}
-        </motion.h2>
-        <motion.p
+        </h2>
+        <p
           className="text-lg md:text-xl mb-8 max-w-2xl font-light"
           style={{ color: '#cbd5e1' }}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
+          >
           {storeData.heroSubtitle}
-        </motion.p>
-        <motion.button
+        </p>
+        <button
           className="px-8 py-3 rounded-lg font-semibold transition-all hover:shadow-2xl"
           style={{ 
             backgroundColor: storeData.accentColor,
             color: storeData.primaryColor
           }}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
           onClick={() => setCurrentPage('shop')}
         >
           SHOP NOW
-        </motion.button>
+        </button>
       </div>
     </div>
   );
@@ -781,7 +772,7 @@ export default function StoreEditor() {
           Back
         </button>
 
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+        <div>
           <h1 className="text-5xl font-bold mb-8" style={{ color: storeData.accentColor }}>About Us</h1>
           <div className="prose prose-lg max-w-none">
             <p className="text-xl leading-relaxed mb-6" style={{ color: '#a0aec0' }}>
@@ -797,7 +788,7 @@ export default function StoreEditor() {
               bringing joy and functionality to your home for years to come.
             </p>
           </div>
-        </motion.div>
+        </div>
       </div>
     </div>
   );
@@ -815,7 +806,7 @@ export default function StoreEditor() {
           Back
         </button>
 
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+        <div>
           <h1 className="text-5xl font-bold mb-4" style={{ color: storeData.accentColor }}>Contact Us</h1>
           <p className="text-xl mb-12" style={{ color: '#a0aec0' }}>
             We would love to hear from you. Get in touch with us today!
@@ -884,7 +875,7 @@ export default function StoreEditor() {
               </p>
             </div>
           </div>
-        </motion.div>
+        </div>
       </div>
     </div>
   );
