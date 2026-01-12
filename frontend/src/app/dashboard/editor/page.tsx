@@ -549,7 +549,7 @@ export default function StoreEditor() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredProducts.map((product) => {
-              const productImage = product.images?.[0] || 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+              const productImage =  product.images.length > 0 ? product.images[0] : 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
               const productCategory = product.metadata?.category || 'General';
               const productBadge = product.isPublished ? undefined : 'Draft';
               
@@ -1983,7 +1983,7 @@ export default function StoreEditor() {
 
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {storeData.products.map((product) => {
-              const productImage = product.images?.[0] || 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+              const productImage = product.images.length > 0 ? product.images[0] : 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
               const productCategory = product.metadata?.category || 'General';
               
               return (

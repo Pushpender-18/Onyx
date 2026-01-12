@@ -15,11 +15,11 @@ struct Item {
 
 struct Order {
 	address buyer;
-	uint256 itemId;
+	string itemId;
 	uint256 quantity;
 	uint256 totalPrice; // Total price in wei
-	uint256 timestamp;
-	bool isDelivered;
+	string timestamp;
+	string txnHash; // Blockchain transaction hash
 }
 
 struct ShopDetails {

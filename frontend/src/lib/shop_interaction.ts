@@ -199,6 +199,69 @@ export async function connectWallet(): Promise<boolean> {
 	}
 }
 
+// Create and send a transaction to transfer ETH
+export async function sendTransaction(receiverAddress: string, amountInEth: number) {
+	try {
+		console.log('💸 Creating transaction to:', receiverAddress);
+		console.log('💰 Amount:', amountInEth, 'ETH');
+		
+		// Get provider and signer
+		const provider = await checkWalletConnection(true); // Require correct network for transactions
+		const signer = await provider.getSigner();
+		const senderAddress = await signer.getAddress();
+		
+		console.log('📤 Sending from:', senderAddress);
+		
+		// Validate receiver address
+		if (!ethers.isAddress(receiverAddress)) {
+			throw new Error('Invalid receiver address');
+		}
+		
+		// Convert ETH amount to wei
+		const amountInWei = ethers.parseUnits(amountInEth.toString(), 18);
+		console.log('💰 Amount in wei:', amountInWei.toString());
+		
+		// Create transaction object
+		const tx = {
+			to: receiverAddress,
+			value: amountInWei
+		};
+		
+		// Send transaction
+		console.log('📝 Sending transaction...');
+		const txResponse = await signer.sendTransaction(tx);
+		console.log('⏳ Transaction sent. Hash:', txResponse.hash);
+		console.log('⏳ Waiting for confirmation...');
+		
+		// Wait for transaction to be mined
+		const receipt = await txResponse.wait();
+		console.log('✅ Transaction confirmed! Block:', receipt?.blockNumber);
+		
+		return {
+			success: true,
+			txHash: txResponse.hash,
+			from: senderAddress,
+			to: receiverAddress,
+			amount: amountInEth,
+			blockNumber: receipt?.blockNumber,
+			gasUsed: receipt?.gasUsed.toString()
+		};
+	} catch (error: any) {
+		console.error('❌ Error sending transaction:', error);
+		
+		// Provide better error messages
+		if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
+			throw new Error('Transaction rejected by user');
+		} else if (error.message?.includes('insufficient funds')) {
+			throw new Error('Insufficient funds to complete transaction');
+		} else if (error.message?.includes('Invalid receiver address')) {
+			throw new Error('Invalid receiver address');
+		}
+		
+		throw error;
+	}
+}
+
 // Check if wallet is connected and available
 // Set requireCorrectNetwork to true for write operations (create, update, delete)
 // Set to false for read operations (get, fetch) to allow viewing data on any network
@@ -397,6 +460,22 @@ export async function getShopDetailsFromContract(shopAddress: string) {
 	}
 }
 
+// Retrieves the owner address of a shop (read operation - doesn't require correct network)
+export async function getShopOwner(shopName: string): Promise<string> {
+	try {
+		const shopAddress = await getShopDetails(shopName);
+		console.log('👤 Fetching owner for shop:', shopAddress);
+		const shopContract = await getShopContract(shopAddress, false); // Read operation
+		const shopDetails = await shopContract.shopDetails();
+		const ownerAddress = shopDetails.owner || shopDetails[5];
+		console.log('✅ Shop owner address:', ownerAddress);
+		return ownerAddress;
+	} catch (error) {
+		console.error('❌ Error fetching shop owner:', error);
+		throw error;
+	}
+}
+
 // shopAddress to be given during actual usage
 // Add Items in the shop (write operation - requires correct network)
 export async function addItemToShop(shopAddress: string = DUMMY_SHOP_ADDRESS,
@@ -458,6 +537,85 @@ export async function getItemsFromShop(shopAddress: string = DUMMY_SHOP_ADDRESS)
 		return items;
 	} catch (error) {
 		console.error('Error fetching items:', error);
+		throw error;
+	}
+}
+
+// Create multiple orders in a single transaction (write operation - requires correct network)
+export async function createTransaction(
+	shopAddress: string,
+	itemIds: string[],
+	quantities: number[],
+	pricesInEth: number[],
+	txnHash: string
+) {
+	try {
+		console.log('🛒 Creating transaction for multiple items');
+		console.log('📦 Item IDs:', itemIds);
+		console.log('📊 Quantities:', quantities);
+		console.log('💰 Prices (ETH):', pricesInEth);
+		
+		// Validate inputs
+		if (itemIds.length !== quantities.length || itemIds.length !== pricesInEth.length) {
+			throw new Error('Arrays length mismatch: itemIds, quantities, and prices must have the same length');
+		}
+		
+		if (itemIds.length === 0) {
+			throw new Error('No items provided');
+		}
+		
+		const shopContract = await getShopContract(shopAddress, true); // Write operation - require correct network
+		const provider = await checkWalletConnection(true);
+		
+		// Convert ETH prices to wei
+		const pricesInWei = pricesInEth.map(price => ethers.parseUnits(price.toString(), 18));
+		console.log('💰 Prices in wei:', pricesInWei.map(p => p.toString()));
+		
+		// Get current timestamp as string
+		const timestamp = Math.floor(Date.now() / 1000).toString();
+		
+		// Send transaction
+		console.log('📝 Sending transaction to blockchain...');
+		const tx = await shopContract.createTransaction(
+			itemIds,
+			quantities,
+			pricesInWei,
+			timestamp,
+			txnHash
+		);
+		
+		console.log('⏳ Transaction sent. Hash:', tx.hash);
+		console.log('⏳ Waiting for confirmation...');
+		
+		const receipt = await tx.wait();
+		console.log('✅ Transaction confirmed! Block:', receipt.blockNumber);
+		console.log('✅ Orders created successfully!');
+		
+		return {
+			success: true,
+			txHash: tx.hash,
+			itemIds,
+			quantities,
+			blockNumber: receipt.blockNumber
+		};
+	} catch (error: any) {
+		console.error('❌ Error creating transaction:', error);
+		
+		// Provide better error messages
+		if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
+			throw new Error('Transaction rejected by user');
+		} else if (error.message?.includes('insufficient funds')) {
+			throw new Error('Insufficient funds to complete transaction');
+		} else if (error.message?.includes('Insufficient stock')) {
+			throw new Error('Insufficient stock available for one or more items');
+		} else if (error.message?.includes('Product does not exist')) {
+			throw new Error('One or more products not found');
+		} else if (error.message?.includes('Product is not active')) {
+			throw new Error('One or more products are no longer available');
+		} else if (error.message?.includes('length mismatch')) {
+			throw new Error('Invalid data: arrays length mismatch');
+		}
+		
 		throw error;
 	}
 }
@@ -628,3 +786,4 @@ export async function updateShopConfiguration(shopAddress: string, newConfigurat
         throw error;
     }
 }
+

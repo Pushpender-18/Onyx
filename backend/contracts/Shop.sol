@@ -88,9 +88,56 @@ contract Shop {
 		items[_itemId].updatedAt = _currentDate;
 	}
 
-	// Creates a new order for a product.
-	function createTransaction() external {
-		// Implementation pending
+	// Creates new orders for multiple products in a single transaction
+	function createTransaction(
+		string[] memory _itemIds,
+		uint256[] memory _quantities,
+		uint256[] memory _prices,
+		string memory _timestamp,
+		string memory _txnHash
+	) external {
+		require(_itemIds.length == _quantities.length, "Item IDs and quantities length mismatch");
+		require(_itemIds.length == _prices.length, "Item IDs and prices length mismatch");
+		require(_itemIds.length > 0, "No items provided");
+		
+		// Create an order for each item
+		for (uint256 i = 0; i < _itemIds.length; i++) {
+			string memory itemId = _itemIds[i];
+			uint256 quantity = _quantities[i];
+			uint256 totalPrice = _prices[i];
+			
+			// Find the item by its string ID
+			bool itemFound = false;
+			uint256 itemIndex = 0;
+			for (uint256 j = 0; j < productCount; j++) {
+				if (keccak256(bytes(items[j].id)) == keccak256(bytes(itemId))) {
+					itemFound = true;
+					itemIndex = j;
+					break;
+				}
+			}
+			
+			// Validate item
+			require(itemFound, "Product does not exist");
+			require(items[itemIndex].isActive, "Product is not active");
+			require(items[itemIndex].stock >= quantity, "Insufficient stock");
+			
+			// Create the order
+			orders[orderCount] = Order({
+				buyer: msg.sender,
+				itemId: itemId,
+				quantity: quantity,
+				totalPrice: totalPrice,
+				timestamp: _timestamp,
+				txnHash: _txnHash
+			});
+			
+			// Update stock
+			items[itemIndex].stock -= quantity;
+			
+			// Increment order count
+			orderCount++;
+		}
 	}
 
 	// Return product count

@@ -6,8 +6,9 @@ import { motion } from 'framer-motion';
 import { ShoppingCart, House, Heart } from 'phosphor-react';
 import toast from 'react-hot-toast';
 import { useShop } from '@/context/ShopContext';
-import { Store, StoreCustomization ,Product as StoreProduct } from '@/types';
+import { Store ,Product as StoreProduct, CartItem } from '@/types';
 import { TEMPLATES, TemplateConfig } from '@/app/dashboard/templateConfig';
+import { createTransaction, getShopOwner, sendTransaction } from '@/lib/shop_interaction';
 
 interface Product {
   id: string;
@@ -51,6 +52,7 @@ export default function PublishedStorePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   useEffect(() => {
     const loadStore = async () => {
@@ -106,7 +108,7 @@ export default function PublishedStorePage() {
             id: p.id,
             name: p.name,
             price: p.price,
-            image: p.images[0] || '',
+            image: p.images.length > 0 ? p.images[0] : 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop',
             category: p.metadata?.category || 'Uncategorized',
             description: p.description,
             badge: p.isPublished ? undefined : 'Draft',
@@ -192,7 +194,94 @@ export default function PublishedStorePage() {
         }
         return [...prev, { id: productId, quantity: 1 }];
       });
-      toast.success(`${product.name} added to cart!`);
+      toast.success(`${product.name} added to cart!`, {duration: 500});
+    }
+  };
+
+  const handleCheckout = async () => {
+    if (!store) {
+      toast.error('Store information not available');
+      return;
+    }
+
+    if (cartItems.length === 0) {
+      toast.error('Your cart is empty');
+      return;
+    }
+
+    setCheckoutLoading(true);
+    const toastId = toast.loading('Processing your order...');
+
+    try {
+      // Prepare arrays for all items in cart
+      const itemIds: string[] = [];
+      const quantities: number[] = [];
+      const prices: number[] = [];
+
+      let totalPriceInEth = 0;
+
+      for (const cartItem of cartItems) {
+        const product = storeProducts.find((p) => p.id === cartItem.id);
+        
+        if (!product) {
+          throw new Error(`Product ${cartItem.id} not found`);
+        }
+
+        // Calculate total price for this item in ETH
+        const _totalPriceInEth = product.price * cartItem.quantity;
+
+        console.log(`🛒 Adding to transaction: ${product.name}, Quantity: ${cartItem.quantity}, Total: ${_totalPriceInEth} ETH`);
+
+        itemIds.push(product.id);
+        quantities.push(cartItem.quantity);
+        prices.push(_totalPriceInEth);
+        totalPriceInEth += _totalPriceInEth;
+      }
+
+        const ownerAddress = await getShopOwner(store.name);
+
+        const txnResult = await sendTransaction(ownerAddress, totalPriceInEth);
+        console.log('✅ Transaction successful:', txnResult.txHash);
+
+      // Create transaction for all items at once
+      console.log('📦 Creating transaction for all items...');
+      const result = await createTransaction(
+        store.id, // Shop contract address
+        itemIds,
+        quantities,
+        prices,
+        txnResult.txHash
+      );
+
+      console.log('✅ Transaction successful:', result);
+
+      // Clear cart after successful checkout
+      setCartItems([]);
+      setCartOpen(false);
+      
+      toast.success('Order placed successfully! 🎉', { id: toastId });
+      toast.success('You will receive confirmation shortly');
+      
+    } catch (error: any) {
+      console.error('❌ Checkout error:', error);
+      
+      let errorMessage = 'Checkout failed. Please try again.';
+      
+      if (error.message) {
+        if (error.message.includes('rejected by user')) {
+          errorMessage = 'Transaction was cancelled';
+        } else if (error.message.includes('insufficient funds')) {
+          errorMessage = 'Insufficient funds for this purchase';
+        } else if (error.message.includes('Insufficient stock')) {
+          errorMessage = 'Some items are out of stock';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      toast.error(errorMessage, { id: toastId });
+    } finally {
+      setCheckoutLoading(false);
     }
   };
 
@@ -383,7 +472,7 @@ export default function PublishedStorePage() {
                   className="p-2 rounded-full text-white transition-all hover:scale-110"
                   style={{ backgroundColor: storeData.accentColor }}
                 >
-                  <ShoppingCart size={20} weight="fill" />
+                  <ShoppingCart size={48} weight="fill" className='bg-red-500' />
                 </button>
               </div>
             </div>
@@ -554,10 +643,26 @@ export default function PublishedStorePage() {
                   </span>
                 </div>
                 <button
-                  className="w-full px-6 py-3 text-white font-semibold rounded-lg transition-all hover:shadow-lg"
+                  className="w-full px-6 py-3 text-black font-semibold rounded-lg transition-all hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   style={{ backgroundColor: storeData.accentColor }}
+                  onClick={handleCheckout}
+                  disabled={checkoutLoading}
                 >
-                  Checkout
+                  {checkoutLoading ? (
+                    <>
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                        className="w-5 h-5 border-2 border-black border-t-transparent rounded-full"
+                      />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart size={20} weight="fill" />
+                      Checkout
+                    </>
+                  )}
                 </button>
               </div>
             </div>

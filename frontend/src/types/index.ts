@@ -96,6 +96,20 @@ export interface Product {
   ipfsHash?: string;
 }
 
+export interface Order {
+  buyer: string;
+  itemId: number;
+  quantity: number;
+  totalPrice: number;
+  timestamp: number;
+  isDelivered: boolean;
+}
+
+export interface CartItem {
+  id: string;
+  quantity: number;
+}
+
 export interface CanvasElement extends LayoutElement {
   isSelected?: boolean;
   isLocked?: boolean;
