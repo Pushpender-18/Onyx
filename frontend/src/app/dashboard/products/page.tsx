@@ -234,7 +234,7 @@ export default function ProductsPage() {
           </motion.div>
         )}
 
-        {/* Products List */}
+        {/* Products List - Grouped by Store */}
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
@@ -247,63 +247,91 @@ export default function ProductsPage() {
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="space-y-4"
+            className="space-y-8"
           >
-            {products.map((product) => (
-              <motion.div
-                key={product.id}
-                variants={itemVariants}
-                className="card p-6 flex items-start gap-6 hover:shadow-lg transition-shadow group"
-              >
-                {/* Product Image */}
-                <div className="w-32 h-32 rounded-lg bg-(--onyx-grey-lighter)/50 shrink-0 flex items-center justify-center">
-                  <Package size={40} weight="light" className="text-(--onyx-grey-light)" />
-                </div>
+            {stores.map((store) => {
+              const storeProducts = products.filter(p => p.storeId === store.id);
+              
+              if (storeProducts.length === 0) return null;
 
-                {/* Product Info */}
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-(--onyx-stone) mb-2">
-                    {product.name}
-                  </h3>
-                  <p className="text-(--onyx-grey) text-sm mb-3">{product.description}</p>
-                  <div className="flex items-center gap-4 flex-wrap">
+              return (
+                <div key={store.id} className="space-y-4">
+                  {/* Store Header */}
+                  <div className="flex items-center justify-between border-b-2 border-(--onyx-grey-lighter) pb-4">
                     <div>
-                      <p className="text-xs text-(--onyx-grey)">Price</p>
-                      <p className="text-xl font-bold text-(--onyx-stone)">
-                        {product.price} MNT
-                      </p>
+                      <h2 className="text-2xl font-bold text-(--onyx-dark)">{store.name}</h2>
+                      <p className="text-sm text-(--onyx-grey) mt-1">{storeProducts.length} product{storeProducts.length !== 1 ? 's' : ''}</p>
                     </div>
-                    {product.metadata?.category && (
-                      <div>
-                        <p className="text-xs text-(--onyx-grey)">Category</p>
-                        <p className="font-medium text-(--onyx-stone)">{product.metadata.category}</p>
-                      </div>
-                    )}
+                    <button
+                      onClick={() => router.push(`/dashboard/products/add?storeId=${store.id}&storeName=${encodeURIComponent(store.name)}&returnUrl=/dashboard/products`)}
+                      className="px-4 py-2 bg-(--onyx-stone) text-(--onyx-white) rounded-lg hover:bg-(--onyx-dark) transition-colors flex items-center gap-2"
+                    >
+                      <Plus size={18} weight="bold" />
+                      Add Product
+                    </button>
+                  </div>
+
+                  {/* Products Grid for this Store */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {storeProducts.map((product) => (
+                      <motion.div
+                        key={product.id}
+                        variants={itemVariants}
+                        className="card p-6 hover:shadow-lg transition-shadow group flex flex-col"
+                      >
+                        {/* Product Image */}
+                        <div className="w-full h-32 rounded-lg bg-(--onyx-grey-lighter)/50 flex items-center justify-center mb-4">
+                          <Package size={40} weight="light" className="text-(--onyx-grey-light)" />
+                        </div>
+
+                        {/* Product Info */}
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold text-(--onyx-stone) mb-2">
+                            {product.name}
+                          </h3>
+                          <p className="text-(--onyx-grey) text-sm mb-3 line-clamp-2">{product.description}</p>
+                          <div className="space-y-2 mb-4">
+                            <div>
+                              <p className="text-xs text-(--onyx-grey)">Price</p>
+                              <p className="text-xl font-bold text-(--onyx-stone)">
+                                {product.price} MNT
+                              </p>
+                            </div>
+                            {product.metadata?.category && (
+                              <div>
+                                <p className="text-xs text-(--onyx-grey)">Category</p>
+                                <p className="text-sm font-medium text-(--onyx-stone)">{product.metadata.category}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-2 justify-end pt-4 border-t border-(--onyx-grey-lighter)">
+                          <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            className="p-2 hover:bg-(--onyx-grey-lighter) rounded-lg transition-colors"
+                            title="Edit product"
+                          >
+                            <Pencil size={18} weight="bold" className="text-(--onyx-grey)" />
+                          </motion.button>
+                          <motion.button
+                            onClick={() => handleDeleteProduct(product.id)}
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            className="p-2 hover:bg-red-100 rounded-lg transition-colors"
+                            title="Delete product"
+                          >
+                            <Trash size={18} weight="bold" className="text-red-500" />
+                          </motion.button>
+                        </div>
+                      </motion.div>
+                    ))}
                   </div>
                 </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    className="p-2 hover:bg-(--onyx-grey-lighter) rounded-lg transition-colors"
-                    title="Edit product"
-                  >
-                    <Pencil size={18} weight="bold" className="text-(--onyx-grey)" />
-                  </motion.button>
-                  <motion.button
-                    onClick={() => handleDeleteProduct(product.id)}
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    className="p-2 hover:bg-red-100 rounded-lg transition-colors"
-                    title="Delete product"
-                  >
-                    <Trash size={18} weight="bold" className="text-red-500" />
-                  </motion.button>
-                </div>
-              </motion.div>
-            ))}
+              );
+            })}
           </motion.div>
         ) : (
           <motion.div
@@ -314,7 +342,15 @@ export default function ProductsPage() {
             <Package size={48} weight="light" className="text-(--onyx-grey-lighter) mx-auto mb-4" />
             <p className="text-(--onyx-grey) mb-6">No products yet</p>
             <button
-              onClick={() => setShowForm(true)}
+              onClick={() => {
+                const firstStore = stores[0];
+                if (firstStore) {
+                  router.push(`/dashboard/products/add?storeId=${firstStore.id}&storeName=${encodeURIComponent(firstStore.name)}&returnUrl=/dashboard/products`);
+                } else {
+                  alert('Please create a store first');
+                  router.push('/dashboard/create-store');
+                }
+              }}
               className="btn-primary inline-block"
             >
               Add Your First Product

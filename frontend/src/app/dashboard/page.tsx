@@ -7,7 +7,7 @@ import { useShop } from '@/context/ShopContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { Plus, ShoppingCart, Package, TrendUp, ArrowRight, ArrowsClockwise } from 'phosphor-react';
+import { Plus, ShoppingCart, TrendUp, ArrowRight, ArrowsClockwise } from 'phosphor-react';
 
 interface Store {
   id: string;
@@ -51,7 +51,6 @@ export default function Dashboard() {
 
   // Calculate stats from actual data
   const totalStores = stores.length;
-  const totalProducts = products.length;
   const totalSales = 0; // This would need to be tracked in smart contract
 
   // Get product count for each store
@@ -107,98 +106,68 @@ export default function Dashboard() {
 
         {/* Main Content */}
         <div className="container-custom py-8 space-y-8">
-          {/* Action Buttons */}
+          {/* Action Buttons and Stats Grid */}
           <motion.div
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="grid grid-cols-1 md:grid-cols-2 gap-4"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
           >
-          <motion.div variants={itemVariants}>
-            <Link
-              href="/dashboard/create-store"
-              className="card p-6 block hover:shadow-lg transition-shadow cursor-pointer"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-(--onyx-stone) mb-2">
-                    Create New Store
-                  </h3>
-                  <p className="text-sm text-(--onyx-grey)">
-                    Launch your decentralized store
-                  </p>
+            {/* Create Store Card */}
+            <motion.div variants={itemVariants}>
+              <Link
+                href="/dashboard/create-store"
+                className="card p-6 block hover:shadow-lg transition-shadow cursor-pointer"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-(--onyx-stone) mb-2">
+                      Create New Store
+                    </h3>
+                    <p className="text-sm text-(--onyx-grey)">
+                      Launch your decentralized store
+                    </p>
+                  </div>
+                  <Plus size={24} weight="bold" className="text-(--onyx-stone)" />
                 </div>
-                <Plus size={24} weight="bold" className="text-(--onyx-stone)" />
-              </div>
-            </Link>
-          </motion.div>
-
-          <motion.div variants={itemVariants}>
-            <Link
-              href="/dashboard/products"
-              className="card p-6 block hover:shadow-lg transition-shadow cursor-pointer"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-(--onyx-stone) mb-2">
-                    Manage Products
-                  </h3>
-                  <p className="text-sm text-(--onyx-grey)">
-                    Add and edit your product catalog
-                  </p>
-                </div>
-                <Package size={24} weight="bold" className="text-(--onyx-stone)" />
-              </div>
-            </Link>
-          </motion.div>
-        </motion.div>
-
-        {/* Stats Grid */}
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="grid grid-cols-1 md:grid-cols-3 gap-4"
-        >
-          {[
-            {
-              label: 'Total Stores',
-              value: totalStores,
-              icon: ShoppingCart,
-            },
-            {
-              label: 'Total Products',
-              value: totalProducts,
-              icon: Package,
-            },
-            {
-              label: 'Total Sales',
-              value: `$${totalSales}`,
-              icon: TrendUp,
-            },
-          ].map((stat, index) => (
-            <motion.div
-              key={index}
-              variants={itemVariants}
-              className="card p-6"
-              whileHover={{ y: -2 }}
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm text-(--onyx-grey) mb-1">{stat.label}</p>
-                  <p className="text-2xl font-bold text-(--onyx-stone)">{stat.value}</p>
-                </div>
-                <div className="w-12 h-12 rounded-lg bg-(--onyx-grey-lighter) flex items-center justify-center">
-                  <stat.icon
-                    size={24}
-                    weight="bold"
-                    className="text-(--onyx-stone)"
-                  />
-                </div>
-              </div>
+              </Link>
             </motion.div>
-          ))}
-        </motion.div>
+
+            {/* Stats */}
+            {[
+              {
+                label: 'Total Stores',
+                value: totalStores,
+                icon: ShoppingCart,
+              },
+              {
+                label: 'Total Sales',
+                value: `$${totalSales}`,
+                icon: TrendUp,
+              },
+            ].map((stat, index) => (
+              <motion.div
+                key={index}
+                variants={itemVariants}
+                className="card p-6"
+                whileHover={{ y: -2 }}
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm text-(--onyx-grey) mb-1">{stat.label}</p>
+                    <p className="text-2xl font-bold text-(--onyx-stone)">{stat.value}</p>
+                  </div>
+                  <div className="w-12 h-12 rounded-lg bg-(--onyx-grey-lighter) flex items-center justify-center">
+                    <stat.icon
+                      size={24}
+                      weight="bold"
+                      className="text-(--onyx-stone)"
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
 
         {/* Recent Stores */}
         <motion.div
