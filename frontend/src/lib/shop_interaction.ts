@@ -26,17 +26,17 @@ async function checkAndSwitchNetwork(throwOnWrongNetwork: boolean = false): Prom
 		const chainId = await ethereum.request({ method: 'eth_chainId' });
 		const currentChainId = parseInt(chainId, 16);
 
-		console.log(`🔍 Current chainId: ${currentChainId}, Required: ${CURRENT_NETWORK.chainId}`);
+		console.log(` Current chainId: ${currentChainId}, Required: ${CURRENT_NETWORK.chainId}`);
 
 		// Check if on correct network
 		if (currentChainId !== CURRENT_NETWORK.chainId) {
-			console.log(`⚠️ Wrong network. Current: ${currentChainId}, Required: ${CURRENT_NETWORK.chainId}`);
+			console.log(` Wrong network. Current: ${currentChainId}, Required: ${CURRENT_NETWORK.chainId}`);
 			
 			// For local network (Hardhat), show a warning
 			if (CURRENT_NETWORK.chainId === 31337) {
-				console.warn(`⚠️ Expected local network (31337) but connected to ${currentChainId}.`);
-				console.warn(`⚠️ Please manually switch to Localhost 8545 in MetaMask.`);
-				console.warn(`⚠️ If the network doesn't exist, add it manually:`);
+				console.warn(` Expected local network (31337) but connected to ${currentChainId}.`);
+				console.warn(` Please manually switch to Localhost 8545 in MetaMask.`);
+				console.warn(` If the network doesn't exist, add it manually:`);
 				console.warn(`   - Network Name: Localhost 8545`);
 				console.warn(`   - RPC URL: http://127.0.0.1:8545`);
 				console.warn(`   - Chain ID: 31337`);
@@ -54,7 +54,7 @@ async function checkAndSwitchNetwork(throwOnWrongNetwork: boolean = false): Prom
 					method: 'wallet_switchEthereumChain',
 					params: [{ chainId: `0x${CURRENT_NETWORK.chainId.toString(16)}` }],
 				});
-				console.log(`✅ Switched to ${CURRENT_NETWORK.chainName}`);
+				console.log(` Switched to ${CURRENT_NETWORK.chainName}`);
 				return true;
 			} catch (switchError: any) {
 				console.error('Switch network error:', switchError);
@@ -76,7 +76,7 @@ async function checkAndSwitchNetwork(throwOnWrongNetwork: boolean = false): Prom
 				}
 			}
 		} else {
-			console.log(`✅ Already on correct network: ${CURRENT_NETWORK.chainName}`);
+			console.log(` Already on correct network: ${CURRENT_NETWORK.chainName}`);
 			return true;
 		}
 	} catch (error: any) {
@@ -118,7 +118,7 @@ async function addNetwork(): Promise<void> {
 			method: 'wallet_addEthereumChain',
 			params: [networkParams],
 		});
-		console.log(`✅ Added ${CURRENT_NETWORK.chainName} network to MetaMask`);
+		console.log(` Added ${CURRENT_NETWORK.chainName} network to MetaMask`);
 	} catch (error: any) {
 		console.error('Error adding network:', error);
 		
@@ -235,7 +235,7 @@ export async function sendTransaction(receiverAddress: string, amountInEth: numb
 		
 		// Wait for transaction to be mined
 		const receipt = await txResponse.wait();
-		console.log('✅ Transaction confirmed! Block:', receipt?.blockNumber);
+		console.log(' Transaction confirmed! Block:', receipt?.blockNumber);
 		
 		return {
 			success: true,
@@ -247,7 +247,7 @@ export async function sendTransaction(receiverAddress: string, amountInEth: numb
 			gasUsed: receipt?.gasUsed.toString()
 		};
 	} catch (error: any) {
-		console.error('❌ Error sending transaction:', error);
+		console.error(' Error sending transaction:', error);
 		
 		// Provide better error messages
 		if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
@@ -438,8 +438,8 @@ export async function getShopDetailsFromContract(shopAddress: string) {
 	try {
 		const shopContract = await getShopContract(shopAddress, false); // Read operation
 		const shopDetails = await shopContract.shopDetails();
-		console.log('📦 Raw shop details from contract:', shopDetails);
-		console.log('📦 isPublished field:', shopDetails.isPublished, 'or index[6]:', shopDetails[6]);
+		console.log(' Raw shop details from contract:', shopDetails);
+		console.log(' isPublished field:', shopDetails.isPublished, 'or index[6]:', shopDetails[6]);
 		
 		// Convert the tuple to a more usable object
 		const result = {
@@ -452,7 +452,7 @@ export async function getShopDetailsFromContract(shopAddress: string) {
 			isPublished: shopDetails.isPublished !== undefined ? shopDetails.isPublished : shopDetails[6],
 		};
 		
-		console.log('📦 Converted shop details:', result);
+		console.log(' Converted shop details:', result);
 		return result;
 	} catch (error) {
 		console.error('Error fetching shop details from contract:', error);
@@ -468,10 +468,10 @@ export async function getShopOwner(shopName: string): Promise<string> {
 		const shopContract = await getShopContract(shopAddress, false); // Read operation
 		const shopDetails = await shopContract.shopDetails();
 		const ownerAddress = shopDetails.owner || shopDetails[5];
-		console.log('✅ Shop owner address:', ownerAddress);
+		console.log(' Shop owner address:', ownerAddress);
 		return ownerAddress;
 	} catch (error) {
-		console.error('❌ Error fetching shop owner:', error);
+		console.error(' Error fetching shop owner:', error);
 		throw error;
 	}
 }
@@ -507,12 +507,12 @@ export async function addItemToShop(shopAddress: string = DUMMY_SHOP_ADDRESS,
 		console.log('⏳ Waiting for confirmation...');
 		
 		const receipt = await tx.wait(); // Wait for transaction confirmation
-		console.log('✅ Transaction confirmed! Block:', receipt.blockNumber);
-		console.log('✅ Product added successfully:', itemName);
+		console.log(' Transaction confirmed! Block:', receipt.blockNumber);
+		console.log(' Product added successfully:', itemName);
 		
 		return { success: true, itemName, shopAddress, txHash: tx.hash };
 	} catch (error: any) {
-		console.error('❌ Error adding product:', error);
+		console.error(' Error adding product:', error);
 		
 		// Provide better error messages
 		if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
@@ -551,8 +551,8 @@ export async function createTransaction(
 ) {
 	try {
 		console.log('🛒 Creating transaction for multiple items');
-		console.log('📦 Item IDs:', itemIds);
-		console.log('📊 Quantities:', quantities);
+		console.log(' Item IDs:', itemIds);
+		console.log(' Quantities:', quantities);
 		console.log('💰 Prices (ETH):', pricesInEth);
 		
 		// Validate inputs
@@ -588,8 +588,8 @@ export async function createTransaction(
 		console.log('⏳ Waiting for confirmation...');
 		
 		const receipt = await tx.wait();
-		console.log('✅ Transaction confirmed! Block:', receipt.blockNumber);
-		console.log('✅ Orders created successfully!');
+		console.log(' Transaction confirmed! Block:', receipt.blockNumber);
+		console.log(' Orders created successfully!');
 		
 		return {
 			success: true,
@@ -599,7 +599,7 @@ export async function createTransaction(
 			blockNumber: receipt.blockNumber
 		};
 	} catch (error: any) {
-		console.error('❌ Error creating transaction:', error);
+		console.error(' Error creating transaction:', error);
 		
 		// Provide better error messages
 		if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
@@ -623,14 +623,14 @@ export async function createTransaction(
 // Publish a shop (make it live) - write operation requires correct network
 export async function publishShop(shopAddress: string) {
 	try {
-		console.log('📢 Publishing shop at:', shopAddress);
+		console.log(' Publishing shop at:', shopAddress);
 		
 		// Check if contract exists at this address
 		const provider = await checkWalletConnection(true);
 		const code = await provider.getCode(shopAddress);
 		
 		if (code === '0x') {
-			console.error('❌ No contract found at address:', shopAddress);
+			console.error(' No contract found at address:', shopAddress);
 			throw new Error('Store contract not found. The Hardhat node may have been restarted. Please recreate your store.');
 		}
 		
@@ -645,7 +645,7 @@ export async function publishShop(shopAddress: string) {
 		
 		console.log('🔑 Caller address:', callerAddress);
 		console.log('👤 Owner address:', ownerAddress);
-		console.log('📊 Current published status:', isPublished);
+		console.log(' Current published status:', isPublished);
 		
 		// Verify ownership
 		if (callerAddress.toLowerCase() !== ownerAddress.toLowerCase()) {
@@ -663,12 +663,12 @@ export async function publishShop(shopAddress: string) {
 		console.log('⏳ Waiting for confirmation...');
 		
 		const receipt = await tx.wait();
-		console.log('✅ Transaction confirmed! Block:', receipt.blockNumber);
-		console.log('✅ Shop published successfully!');
+		console.log(' Transaction confirmed! Block:', receipt.blockNumber);
+		console.log(' Shop published successfully!');
 		
 		return { success: true, txHash: tx.hash, shopAddress };
 	} catch (error: any) {
-		console.error('❌ Error publishing shop:', error);
+		console.error(' Error publishing shop:', error);
 		
 		// Provide better error messages based on error type
 		if (error.code === 'CALL_EXCEPTION') {
@@ -724,7 +724,7 @@ export async function updateShopConfiguration(shopAddress: string, newConfigurat
         const code = await provider.getCode(shopAddress);
         
         if (code === '0x') {
-            console.error('❌ No contract found at address:', shopAddress);
+            console.error(' No contract found at address:', shopAddress);
             throw new Error('Store contract not found. The Hardhat node may have been restarted. Please recreate your store.');
         }
         
@@ -752,12 +752,12 @@ export async function updateShopConfiguration(shopAddress: string, newConfigurat
         console.log('⏳ Waiting for confirmation...');
         
         const receipt = await tx.wait();
-        console.log('✅ Transaction confirmed! Block:', receipt.blockNumber);
-        console.log('✅ Shop configuration updated successfully!');
+        console.log(' Transaction confirmed! Block:', receipt.blockNumber);
+        console.log(' Shop configuration updated successfully!');
         
         return { success: true, txHash: tx.hash, shopAddress };
     } catch (error: any) {
-        console.error('❌ Error updating shop configuration:', error);
+        console.error(' Error updating shop configuration:', error);
         
         // Provide better error messages based on error type
         if (error.code === 'CALL_EXCEPTION') {

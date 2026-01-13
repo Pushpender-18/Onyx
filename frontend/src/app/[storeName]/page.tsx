@@ -9,6 +9,7 @@ import { useShop } from '@/context/ShopContext';
 import { Store ,Product as StoreProduct, CartItem } from '@/types';
 import { TEMPLATES, TemplateConfig } from '@/app/dashboard/templateConfig';
 import { createTransaction, getShopOwner, sendTransaction } from '@/lib/shop_interaction';
+import { getIPFSUrl } from '@/lib/ipfs-upload';
 
 interface Product {
   id: string;
@@ -65,13 +66,13 @@ export default function PublishedStorePage() {
         if (!foundStore) {
           console.log('📡 Store not in cache, fetching from blockchain...');
           const filteredStoreName = storeName.replaceAll('%20', ' ');
-          console.log('🔍 Fetching store with name:', filteredStoreName);
+          console.log(' Fetching store with name:', filteredStoreName);
           const fetchedStore = await getStoreByName(filteredStoreName);
           
           console.log('📡 Fetched store from blockchain:', storeName);
 
           if (fetchedStore) {
-            console.log('✅ Store found on blockchain:', fetchedStore);
+            console.log(' Store found on blockchain:', fetchedStore);
             foundStore = fetchedStore;
           }
         }
@@ -82,7 +83,7 @@ export default function PublishedStorePage() {
           return;
         }
 
-        console.log('✅ Store found:', foundStore);
+        console.log(' Store found:', foundStore);
         setStore(foundStore);
 
         // Load template configuration based on templateId
@@ -93,7 +94,7 @@ export default function PublishedStorePage() {
 
         // Load products for this store
         const storeProds = await getProducts(foundStore.id);
-        console.log('📦 Store products:', storeProds);
+        console.log(' Store products:', storeProds);
         setStoreProducts(storeProds);
 
         // Convert to StoreData format for existing UI
@@ -108,7 +109,7 @@ export default function PublishedStorePage() {
             id: p.id,
             name: p.name,
             price: p.price,
-            image: p.images.length > 0 ? p.images[0] : 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop',
+            image: p.images.length > 0 ? getIPFSUrl(p.images[0]) : 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop',
             category: p.metadata?.category || 'Uncategorized',
             description: p.description,
             badge: p.isPublished ? undefined : 'Draft',
@@ -133,7 +134,7 @@ export default function PublishedStorePage() {
         setStoreData(convertedData);
         setError(null);
       } catch (err: any) {
-        console.error('❌ Error loading store:', err);
+        console.error(' Error loading store:', err);
         setError('Failed to load store data: ' + err.message);
       } finally {
         setLoading(false);
@@ -241,10 +242,10 @@ export default function PublishedStorePage() {
         const ownerAddress = await getShopOwner(store.name);
 
         const txnResult = await sendTransaction(ownerAddress, totalPriceInEth);
-        console.log('✅ Transaction successful:', txnResult.txHash);
+        console.log(' Transaction successful:', txnResult.txHash);
 
       // Create transaction for all items at once
-      console.log('📦 Creating transaction for all items...');
+      console.log(' Creating transaction for all items...');
       const result = await createTransaction(
         store.id, // Shop contract address
         itemIds,
@@ -253,7 +254,7 @@ export default function PublishedStorePage() {
         txnResult.txHash
       );
 
-      console.log('✅ Transaction successful:', result);
+      console.log(' Transaction successful:', result);
 
       // Clear cart after successful checkout
       setCartItems([]);
@@ -263,7 +264,7 @@ export default function PublishedStorePage() {
       toast.success('You will receive confirmation shortly');
       
     } catch (error: any) {
-      console.error('❌ Checkout error:', error);
+      console.error(' Checkout error:', error);
       
       let errorMessage = 'Checkout failed. Please try again.';
       
@@ -444,6 +445,19 @@ export default function PublishedStorePage() {
                 src={product.image}
                 alt={product.name}
                 className="w-full h-full object-cover hover:scale-110 transition-transform"
+                onError={(e) => {
+                  const img = e.target as HTMLImageElement;
+                  // If current image fails, try ipfs.io gateway
+                  if (!img.src.includes('ipfs.io')) {
+                    img.src = product.image.replace('gateway.pinata.cloud', 'ipfs.io');
+                  } else if (!img.src.includes('cloudflare-ipfs.com')) {
+                    // If ipfs.io fails, try Cloudflare
+                    img.src = product.image.replace('gateway.pinata.cloud', 'cloudflare-ipfs.com');
+                  } else {
+                    // If all gateways fail, use fallback
+                    img.src = 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+                  }
+                }}
               />
               {product.badge && (
                 <div
@@ -557,6 +571,16 @@ export default function PublishedStorePage() {
                   src={selectedProduct.image}
                   alt={selectedProduct.name}
                   className="w-full rounded-lg"
+                  onError={(e) => {
+                    const img = e.target as HTMLImageElement;
+                    if (!img.src.includes('ipfs.io')) {
+                      img.src = selectedProduct.image.replace('gateway.pinata.cloud', 'ipfs.io');
+                    } else if (!img.src.includes('cloudflare-ipfs.com')) {
+                      img.src = selectedProduct.image.replace('gateway.pinata.cloud', 'cloudflare-ipfs.com');
+                    } else {
+                      img.src = 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+                    }
+                  }}
                 />
               </div>
               <div>
@@ -621,6 +645,18 @@ export default function PublishedStorePage() {
                       src={product?.image}
                       alt={product?.name}
                       className="w-20 h-20 rounded object-cover"
+                      onError={(e) => {
+                        const img = e.target as HTMLImageElement;
+                        if (product?.image) {
+                          if (!img.src.includes('ipfs.io')) {
+                            img.src = product.image.replace('gateway.pinata.cloud', 'ipfs.io');
+                          } else if (!img.src.includes('cloudflare-ipfs.com')) {
+                            img.src = product.image.replace('gateway.pinata.cloud', 'cloudflare-ipfs.com');
+                          } else {
+                            img.src = 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+                          }
+                        }
+                      }}
                     />
                     <div className="flex-1">
                       <h3 className="font-semibold">{product?.name}</h3>

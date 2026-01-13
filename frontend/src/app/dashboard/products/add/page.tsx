@@ -61,7 +61,7 @@ export default function AddProductPage() {
         return;
       }
 
-      console.log('🔍 Looking for store:', { storeId, storeName });
+      console.log(' Looking for store:', { storeId, storeName });
       
       // First check if store is already in the stores array
       let store = stores.find(s => s.id === storeId);
@@ -80,7 +80,7 @@ export default function AddProductPage() {
       
       // If still not found, create a minimal store object from URL params
       if (!store) {
-        console.log('⚠️ Store not found in array, creating from URL params');
+        console.log(' Store not found in array, creating from URL params');
         store = {
           id: storeId,
           name: storeName,
@@ -102,7 +102,7 @@ export default function AddProductPage() {
         };
       }
       
-      console.log('✅ Using store:', store);
+      console.log(' Using store:', store);
       setCurrentStore(store);
       setLoadingStore(false);
     };
@@ -251,7 +251,7 @@ export default function AddProductPage() {
         }
         
         imageHash = ipfsResult.hash;
-        console.log('✅ Image uploaded to IPFS:', imageHash);
+        console.log(' Image uploaded to IPFS:', imageHash);
         console.log('🔗 Image URL:', ipfsResult.url);
       }
       
@@ -273,7 +273,7 @@ export default function AddProductPage() {
 
       if (newProduct) {
         toast.success('Product added successfully!', { id: loadingToast });
-        console.log('✅ Product saved:', newProduct);
+        console.log(' Product saved:', newProduct);
         
         // Wait a moment for the user to see the success message
         setTimeout(() => {
@@ -283,7 +283,7 @@ export default function AddProductPage() {
         toast.error('Failed to add product', { id: loadingToast });
       }
     } catch (error: any) {
-      console.error('❌ Error adding product:', error);
+      console.error(' Error adding product:', error);
       
       let errorMessage = 'Failed to add product';
       if (error.message?.includes('rejected')) {

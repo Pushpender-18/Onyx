@@ -77,7 +77,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       console.log('🔨 Creating shop on blockchain:', name);
       // Call blockchain function
       const response = await shopInteraction.createShop(name, templateId, description, configuration);
-      console.log('✅ Shop created, response:', response);
+      console.log(' Shop created, response:', response);
       
       // Get the shop address
       const shopAddress = await shopInteraction.getShopDetails(name);
@@ -85,7 +85,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       
       // Get the full shop details from the contract
       const shopDetails = await shopInteraction.getShopDetailsFromContract(shopAddress);
-      console.log('📦 Shop details:', shopDetails);
+      console.log(' Shop details:', shopDetails);
       
       // Create store object for local state
       const newStore: Store = {
@@ -102,7 +102,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
 
       // Add to local state
       setStores((prev) => [...prev, newStore]);
-      console.log('✅ Store added to local state');
+      console.log(' Store added to local state');
       
       setIsLoading(false);
       return newStore;
@@ -133,12 +133,12 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     setError(null);
 
     try {
-      console.log('🔍 Fetching all shops from blockchain...');
+      console.log(' Fetching all shops from blockchain...');
       const shopNames = await shopInteraction.getAllShops();
-      console.log('📦 Received shop names:', shopNames);
+      console.log(' Received shop names:', shopNames);
       
       if (!shopNames || shopNames.length === 0) {
-        console.log('⚠️ No shops found on blockchain');
+        console.log(' No shops found on blockchain');
         setStores([]);
         setIsLoading(false);
         return [];
@@ -166,8 +166,8 @@ export function ShopProvider({ children }: { children: ReactNode }) {
             
             // Now get the actual shop details from the Shop contract
             const shopDetailsResult = await shopInteraction.getShopDetailsFromContract(shopAddress);
-            console.log(`  ✅ Got details for ${shopName}:`, shopDetailsResult);
-            console.log(`  🔍 isPublished value:`, shopDetailsResult.isPublished);
+            console.log(`   Got details for ${shopName}:`, shopDetailsResult);
+            console.log(`   isPublished value:`, shopDetailsResult.isPublished);
             
             const storeData = {
               id: shopAddress, // Use contract address as ID
@@ -192,14 +192,14 @@ export function ShopProvider({ children }: { children: ReactNode }) {
             console.log(`  📝 Store data to be added:`, storeData);
             return storeData;
           } catch (err) {
-            console.error(`  ❌ Error fetching shop details for ${shopName}:`, err);
+            console.error(`   Error fetching shop details for ${shopName}:`, err);
             return null;
           }
         })
       );
 
       const validStores = storesData.filter((store): store is Store => store !== null);
-      console.log('✅ Successfully loaded stores:', validStores);
+      console.log(' Successfully loaded stores:', validStores);
       setStores(validStores);
       setIsLoading(false);
       return validStores;
@@ -271,7 +271,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       
       // Call blockchain function with shopName
       await shopInteraction.updateShopConfiguration(shopAddress, configuration, shopName);
-      console.log('✅ Configuration updated on blockchain');
+      console.log(' Configuration updated on blockchain');
       
       // Update local state
       setStores((prev) =>
@@ -398,9 +398,9 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     setError(null);
 
     try {
-      console.log('📦 Fetching products for shop:', shopAddress);
+      console.log(' Fetching products for shop:', shopAddress);
       const blockchainItems = await shopInteraction.getItemsFromShop(shopAddress);
-      console.log('📦 Received items:', blockchainItems);
+      console.log(' Received items:', blockchainItems);
       
       // Convert blockchain data to Product objects
       const productsData: Product[] = blockchainItems.map((item: any, index: number) => {
@@ -426,7 +426,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
         };
       });
 
-      console.log('✅ Converted products:', productsData);
+      console.log(' Converted products:', productsData);
 
       // Update local state with products for this store
       setProducts((prev) => {
@@ -439,7 +439,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
       return productsData;
     } catch (err: any) {
-      console.error('❌ Error fetching products:', err);
+      console.error(' Error fetching products:', err);
       setError(err.message || 'Failed to fetch products');
       setIsLoading(false);
       // Return cached products for this store

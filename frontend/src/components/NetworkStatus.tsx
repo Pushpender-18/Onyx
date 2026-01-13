@@ -43,7 +43,7 @@ export function NetworkStatus() {
           method: 'wallet_switchEthereumChain',
           params: [{ chainId: `0x${CURRENT_NETWORK.chainId.toString(16)}` }],
         });
-        console.log(`✅ Switched to ${CURRENT_NETWORK.chainName}`);
+        console.log(` Switched to ${CURRENT_NETWORK.chainName}`);
       } catch (switchError: any) {
         // Network not added to MetaMask, try to add it
         if (switchError.code === 4902) {
@@ -61,7 +61,7 @@ export function NetworkStatus() {
               blockExplorerUrls: CURRENT_NETWORK.blockExplorer ? [CURRENT_NETWORK.blockExplorer] : undefined,
             }],
           });
-          console.log(`✅ Added ${CURRENT_NETWORK.chainName} network to MetaMask`);
+          console.log(` Added ${CURRENT_NETWORK.chainName} network to MetaMask`);
         } else {
           throw switchError;
         }

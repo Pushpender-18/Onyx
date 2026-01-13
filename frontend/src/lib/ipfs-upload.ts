@@ -24,7 +24,10 @@ export interface IPFSUploadResult {
 // Configuration for IPFS services (to be configured for production)
 const IPFS_CONFIG = {
   // Set to 'placeholder' for development, or 'pinata', 'infura', 'local' for production
-  provider: 'placeholder' as 'placeholder' | 'pinata' | 'infura' | 'local',
+  // Check if Pinata credentials are available, otherwise use placeholder
+  provider: (process.env.NEXT_PUBLIC_PINATA_API_KEY && process.env.NEXT_PUBLIC_PINATA_SECRET_API_KEY) 
+    ? 'pinata' 
+    : 'placeholder' as 'placeholder' | 'pinata' | 'infura' | 'local',
   
   // Pinata configuration
   pinata: {
@@ -55,25 +58,36 @@ const IPFS_CONFIG = {
 export async function uploadImageToIPFS(imageData: string | File): Promise<IPFSUploadResult> {
   try {
     console.log('📤 Uploading image to IPFS...');
+    console.log('🔧 Using provider:', IPFS_CONFIG.provider);
+    console.log(' Config details:', {
+      provider: IPFS_CONFIG.provider,
+      hasPinataKey: !!IPFS_CONFIG.pinata.apiKey,
+      hasInfuraId: !!IPFS_CONFIG.infura.projectId,
+    });
     
     switch (IPFS_CONFIG.provider) {
       case 'placeholder':
+        console.log(' Using placeholder mode (no real IPFS upload)');
         return uploadToPlaceholder(imageData);
       
       case 'pinata':
+        console.log('🎯 Using Pinata provider');
         return uploadToPinata(imageData);
       
       case 'infura':
+        console.log('🎯 Using Infura provider');
         return uploadToInfura(imageData);
       
       case 'local':
+        console.log('🎯 Using local IPFS node');
         return uploadToLocalNode(imageData);
       
       default:
+        console.log(' Unknown provider, falling back to placeholder');
         return uploadToPlaceholder(imageData);
     }
   } catch (error: any) {
-    console.error('❌ Error uploading to IPFS:', error);
+    console.error(' Error uploading to IPFS:', error);
     return {
       success: false,
       hash: '',
@@ -97,7 +111,7 @@ async function uploadToPlaceholder(imageData: string | File): Promise<IPFSUpload
   const randomPart = Math.random().toString(36).substring(2, 15);
   const placeholderHash = `QmPlaceholder${randomPart}${timestamp}`;
   
-  console.log('✅ Generated placeholder IPFS hash:', placeholderHash);
+  console.log(' Generated placeholder IPFS hash:', placeholderHash);
   
   return {
     success: true,
@@ -113,41 +127,66 @@ async function uploadToPlaceholder(imageData: string | File): Promise<IPFSUpload
 async function uploadToPinata(imageData: string | File): Promise<IPFSUploadResult> {
   const { apiKey, secretApiKey, gateway } = IPFS_CONFIG.pinata;
   
+  console.log('🔑 Pinata credentials check:', {
+    hasApiKey: !!apiKey,
+    hasSecretKey: !!secretApiKey,
+    apiKeyLength: apiKey?.length || 0,
+    secretKeyLength: secretApiKey?.length || 0,
+  });
+  
   if (!apiKey || !secretApiKey) {
     throw new Error('Pinata API credentials not configured. Set NEXT_PUBLIC_PINATA_API_KEY and NEXT_PUBLIC_PINATA_SECRET_API_KEY');
   }
   
-  // Convert base64 to blob if needed
-  const blob = typeof imageData === 'string' 
-    ? await fetch(imageData).then(r => r.blob())
-    : imageData;
-  
-  const formData = new FormData();
-  formData.append('file', blob);
-  
-  const response = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
-    method: 'POST',
-    headers: {
-      'pinata_api_key': apiKey,
-      'pinata_secret_api_key': secretApiKey,
-    },
-    body: formData,
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Pinata upload failed: ${response.statusText}`);
+  try {
+    // Convert base64 to blob if needed
+    console.log(' Converting image data to blob...');
+    const blob = typeof imageData === 'string' 
+      ? await fetch(imageData).then(r => r.blob())
+      : imageData;
+    
+    console.log('📤 Blob created, size:', blob.size, 'bytes');
+    
+    const formData = new FormData();
+    formData.append('file', blob);
+    
+    console.log('📨 Sending request to Pinata API...');
+    const response = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
+      method: 'POST',
+      headers: {
+        'pinata_api_key': apiKey,
+        'pinata_secret_api_key': secretApiKey,
+      },
+      body: formData,
+    });
+    
+    console.log('📬 Pinata response status:', response.status, response.statusText);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(' Pinata error response:', errorText);
+      throw new Error(`Pinata upload failed: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+    
+    const result = await response.json();
+    console.log(' Pinata response:', result);
+    
+    const ipfsHash = result.IpfsHash;
+    if (!ipfsHash) {
+      throw new Error('No IpfsHash in Pinata response');
+    }
+    
+    console.log(' Uploaded to Pinata:', ipfsHash);
+    
+    return {
+      success: true,
+      hash: ipfsHash,
+      url: `${gateway}${ipfsHash}`,
+    };
+  } catch (error: any) {
+    console.error(' Error in Pinata upload:', error.message);
+    throw error;
   }
-  
-  const result = await response.json();
-  const ipfsHash = result.IpfsHash;
-  
-  console.log('✅ Uploaded to Pinata:', ipfsHash);
-  
-  return {
-    success: true,
-    hash: ipfsHash,
-    url: `${gateway}${ipfsHash}`,
-  };
 }
 
 /**
@@ -186,7 +225,7 @@ async function uploadToInfura(imageData: string | File): Promise<IPFSUploadResul
   const result = await response.json();
   const ipfsHash = result.Hash;
   
-  console.log('✅ Uploaded to Infura:', ipfsHash);
+  console.log(' Uploaded to Infura:', ipfsHash);
   
   return {
     success: true,
@@ -222,7 +261,7 @@ async function uploadToLocalNode(imageData: string | File): Promise<IPFSUploadRe
   const result = await response.json();
   const ipfsHash = result.Hash;
   
-  console.log('✅ Uploaded to local IPFS node:', ipfsHash);
+  console.log(' Uploaded to local IPFS node:', ipfsHash);
   
   return {
     success: true,
@@ -237,11 +276,40 @@ async function uploadToLocalNode(imageData: string | File): Promise<IPFSUploadRe
  * @returns URL to access the image
  */
 export function getIPFSUrl(ipfsHash: string): string {
+  // Handle empty or invalid hash
+  if (!ipfsHash || typeof ipfsHash !== 'string') {
+    console.warn(' Invalid IPFS hash provided:', ipfsHash);
+    return 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+  }
+
   // Remove any ipfs:// protocol prefix if present
-  const cleanHash = ipfsHash.replace(/^ipfs:\/\//, '');
+  const cleanHash = ipfsHash.trim().replace(/^ipfs:\/\//, '');
   
-  // Use public gateway for retrieval
-  return `https://ipfs.io/ipfs/${cleanHash}`;
+  console.log(' Processing IPFS hash:', { original: ipfsHash, cleaned: cleanHash });
+
+  // Validate that it looks like a valid hash
+  // Accepts: CIDv0 (Qm followed by chars) or CIDv1 (bafy or z prefix) or any alphanumeric that looks like a hash
+  const isValidHash = cleanHash.match(/^(Qm[a-zA-Z0-9]+|bafy[a-zA-Z0-9]+|z[a-zA-Z0-9]+|[a-zA-Z0-9]{46,})$/);
+  
+  if (!isValidHash) {
+    console.warn(' Invalid IPFS hash format:', cleanHash, 'length:', cleanHash.length);
+    return 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+  }
+
+  console.log(' Valid IPFS hash detected:', cleanHash);
+
+  // Use Pinata gateway as primary (since we upload via Pinata)
+  // Fallback to ipfs.io if Pinata has issues
+  const gateways = [
+    `https://gateway.pinata.cloud/ipfs/${cleanHash}`,  // Primary - Pinata
+    `https://ipfs.io/ipfs/${cleanHash}`,                 // Fallback - Public gateway
+    `https://cloudflare-ipfs.com/ipfs/${cleanHash}`,    // Fallback - Cloudflare
+  ];
+  
+  // Return primary gateway
+  console.log('📍 IPFS URL:', gateways[0]);
+  
+  return gateways[0];
 }
 
 /**
@@ -258,7 +326,31 @@ export async function uploadMultipleImagesToIPFS(
   const results = await Promise.all(uploadPromises);
   
   const successCount = results.filter(r => r.success).length;
-  console.log(`✅ Successfully uploaded ${successCount}/${images.length} images`);
+  console.log(` Successfully uploaded ${successCount}/${images.length} images`);
   
   return results;
+}
+
+/**
+ * Get alternative IPFS gateway URLs for the same hash
+ * Useful for fallback when primary gateway fails
+ * @param ipfsHash - The IPFS content identifier
+ * @returns Array of gateway URLs
+ */
+export function getIPFSGatewayUrls(ipfsHash: string): string[] {
+  // Handle empty or invalid hash
+  if (!ipfsHash || typeof ipfsHash !== 'string') {
+    return ['https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop'];
+  }
+
+  // Remove any ipfs:// protocol prefix if present
+  const cleanHash = ipfsHash.trim().replace(/^ipfs:\/\//, '');
+  
+  // Return multiple gateway options
+  return [
+    `https://gateway.pinata.cloud/ipfs/${cleanHash}`,  // Primary - Pinata
+    `https://ipfs.io/ipfs/${cleanHash}`,                 // Fallback - Public gateway
+    `https://cloudflare-ipfs.com/ipfs/${cleanHash}`,    // Fallback - Cloudflare
+    `https://dweb.link/ipfs/${cleanHash}`,               // Fallback - IPFS DNSLink gateway
+  ];
 }

@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { Plus, Trash, Pencil, Package } from 'phosphor-react';
 import { useShop } from '@/context/ShopContext';
+import { getIPFSUrl } from '@/lib/ipfs-upload';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -280,8 +281,19 @@ export default function ProductsPage() {
                         className="card p-6 hover:shadow-lg transition-shadow group flex flex-col"
                       >
                         {/* Product Image */}
-                        <div className="w-full h-32 rounded-lg bg-(--onyx-grey-lighter)/50 flex items-center justify-center mb-4">
-                          <Package size={40} weight="light" className="text-(--onyx-grey-light)" />
+                        <div className="w-full h-32 rounded-lg bg-(--onyx-grey-lighter)/50 flex items-center justify-center mb-4 overflow-hidden">
+                          {product.images && product.images.length > 0 ? (
+                            <img
+                              src={getIPFSUrl(product.images[0])}
+                              alt={product.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+                              }}
+                            />
+                          ) : (
+                            <Package size={40} weight="light" className="text-(--onyx-grey-light)" />
+                          )}
                         </div>
 
                         {/* Product Info */}

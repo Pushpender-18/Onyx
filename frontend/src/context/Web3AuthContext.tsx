@@ -46,10 +46,10 @@ export const Web3AuthProvider: React.FC<{ children: ReactNode }> = ({ children }
                 setIsAuthenticated(true);
                 setUser(parsedUser);
                 setWalletAddress(storedWallet);
-                console.log('✅ Auth state restored from localStorage');
+                console.log(' Auth state restored from localStorage');
               } else {
                 // Wallet disconnected, clear state
-                console.log('⚠️ Wallet disconnected, clearing auth state');
+                console.log(' Wallet disconnected, clearing auth state');
                 clearAuthState();
               }
             } catch (error) {
@@ -57,7 +57,7 @@ export const Web3AuthProvider: React.FC<{ children: ReactNode }> = ({ children }
               clearAuthState();
             }
           } else {
-            console.log('⚠️ MetaMask not found, clearing auth state');
+            console.log(' MetaMask not found, clearing auth state');
             clearAuthState();
           }
         }
@@ -146,7 +146,7 @@ export const Web3AuthProvider: React.FC<{ children: ReactNode }> = ({ children }
       localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(newUser));
       localStorage.setItem(WALLET_STORAGE_KEY, address);
       
-      console.log('✅ MetaMask wallet connected:', address);
+      console.log(' MetaMask wallet connected:', address);
       console.log('📡 Network:', network.name, 'Chain ID:', network.chainId.toString());
     } catch (error: any) {
       console.error('Login error:', error);
@@ -171,7 +171,7 @@ export const Web3AuthProvider: React.FC<{ children: ReactNode }> = ({ children }
 
       clearAuthState();
       
-      console.log('✅ User logged out successfully');
+      console.log(' User logged out successfully');
     } catch (error) {
       console.error('Logout error:', error);
       throw error;

@@ -28,6 +28,7 @@ import {
 import { TEMPLATES, DEFAULT_TEMPLATE, type TemplateConfig } from '../templateConfig';
 import { SavePublishModal } from '@/components/SavePublishModal';
 import { publishShop, updateShopConfiguration } from '@/lib/shop_interaction';
+import { getIPFSUrl } from '@/lib/ipfs-upload';
 
 type PageType = 'home' | 'shop' | 'product' | 'about' | 'contact' | 'cart' | 'checkout';
 
@@ -105,12 +106,12 @@ export default function StoreEditor() {
 
         if (foundStore) {
           const data = await getStoreByName(foundStore.name);
-          console.log('✅ Store found:', data);
+          console.log(' Store found:', data);
           setCurrentStore(data);
 
           // Load products for this store
           const storeProducts = await getProducts(foundStore.id);
-          console.log('📦 Loaded products:', storeProducts);
+          console.log(' Loaded products:', storeProducts);
 
           // No conversion needed - storeProducts is already Product[]
           
@@ -131,7 +132,7 @@ export default function StoreEditor() {
           setHasLoadedStore(true); // Mark as loaded
         }
       } catch (error) {
-        console.error('❌ Error loading store data:', error);
+        console.error(' Error loading store data:', error);
         toast.error('Failed to load store data');
       } finally {
         setLoadingStore(false);
@@ -219,7 +220,7 @@ export default function StoreEditor() {
       setEditingProduct(null);
       setShowProductModal(false);
     } catch (error) {
-      console.error('❌ Error updating product:', error);
+      console.error(' Error updating product:', error);
       toast.error('Failed to save product');
     }
   };
@@ -252,7 +253,7 @@ export default function StoreEditor() {
     const loadingToast = toast.loading('Preparing to publish store...');
 
     try {
-      console.log('📢 Publishing store to blockchain...');
+      console.log(' Publishing store to blockchain...');
       console.log('Store address:', currentStore.id);
       console.log('Store name:', finalStoreName);
       
@@ -290,7 +291,7 @@ export default function StoreEditor() {
         throw new Error('Failed to update shop configuration');
       }
       
-      console.log('✅ Configuration updated successfully');
+      console.log(' Configuration updated successfully');
       
       // Save to localStorage for quick access
       localStorage.setItem(
@@ -305,7 +306,7 @@ export default function StoreEditor() {
         window.location.href = `/${finalStoreName}`;
       }, 2000);
     } catch (error: any) {
-      console.error('❌ Error publishing store:', error);
+      console.error(' Error publishing store:', error);
       
       let errorMessage = 'Failed to publish store';
       if (error.message?.includes('rejected')) {
@@ -549,7 +550,7 @@ export default function StoreEditor() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredProducts.map((product) => {
-              const productImage =  product.images.length > 0 ? product.images[0] : 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+              const productImage =  product.images.length > 0 ? getIPFSUrl(product.images[0]) : 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
               const productCategory = product.metadata?.category || 'General';
               const productBadge = product.isPublished ? undefined : 'Draft';
               
@@ -572,6 +573,16 @@ export default function StoreEditor() {
                       src={productImage}
                       alt={product.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      onError={(e) => {
+                        const img = e.target as HTMLImageElement;
+                        if (!img.src.includes('ipfs.io')) {
+                          img.src = productImage.replace('gateway.pinata.cloud', 'ipfs.io');
+                        } else if (!img.src.includes('cloudflare-ipfs.com')) {
+                          img.src = productImage.replace('gateway.pinata.cloud', 'cloudflare-ipfs.com');
+                        } else {
+                          img.src = 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+                        }
+                      }}
                     />
                     <div
                       className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
@@ -650,7 +661,7 @@ export default function StoreEditor() {
   const ProductDetailPage = () => {
     if (!selectedProduct) return null;
     
-    const productImage = selectedProduct.images?.[0] || 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+    const productImage = selectedProduct.images && selectedProduct.images.length > 0 ? getIPFSUrl(selectedProduct.images[0]) : 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
     const productCategory = selectedProduct.metadata?.category || 'General';
 
     return (
@@ -676,6 +687,16 @@ export default function StoreEditor() {
                 src={productImage}
                 alt={selectedProduct.name}
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  const img = e.target as HTMLImageElement;
+                  if (!img.src.includes('ipfs.io')) {
+                    img.src = productImage.replace('gateway.pinata.cloud', 'ipfs.io');
+                  } else if (!img.src.includes('cloudflare-ipfs.com')) {
+                    img.src = productImage.replace('gateway.pinata.cloud', 'cloudflare-ipfs.com');
+                  } else {
+                    img.src = 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+                  }
+                }}
               />
             </motion.div>
 
@@ -923,7 +944,7 @@ export default function StoreEditor() {
               <div className="md:col-span-2">
                 <div className="space-y-4">
                   {cartProducts.map((item) => {
-                    const itemImage = item.images?.[0] || 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+                    const itemImage = item.images && item.images.length > 0 ? getIPFSUrl(item.images[0]) : 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
                     
                     return (
                       <div
@@ -935,6 +956,16 @@ export default function StoreEditor() {
                           src={itemImage}
                           alt={item.name}
                           className="w-24 h-24 object-cover rounded"
+                          onError={(e) => {
+                            const img = e.target as HTMLImageElement;
+                            if (!img.src.includes('ipfs.io')) {
+                              img.src = itemImage.replace('gateway.pinata.cloud', 'ipfs.io');
+                            } else if (!img.src.includes('cloudflare-ipfs.com')) {
+                              img.src = itemImage.replace('gateway.pinata.cloud', 'cloudflare-ipfs.com');
+                            } else {
+                              img.src = 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+                            }
+                          }}
                         />
                         <div className="flex-1">
                           <h3 className="text-lg font-bold" style={{ color: '#cbd5e1' }}>{item.name}</h3>
@@ -1471,18 +1502,7 @@ export default function StoreEditor() {
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-semibold mb-2">Preview</label>
-                      {/* <ImagePreview src={uploadedImage} scale={cropScale} offsetX={cropOffsetX} offsetY={cropOffsetY} /> */}
                     </div>
-
-                    {/* Crop Controls */}
-                    {/* <CropControls
-                      scale={cropScale}
-                      offsetX={cropOffsetX}
-                      offsetY={cropOffsetY}
-                      onScaleChange={handleCropScaleChange}
-                      onOffsetXChange={handleCropOffsetXChange}
-                      onOffsetYChange={handleCropOffsetYChange}
-                    /> */}
 
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                       <p className="text-sm text-blue-800">
@@ -1551,7 +1571,7 @@ export default function StoreEditor() {
                     <div className="w-full bg-gray-100 rounded-lg overflow-hidden border border-gray-300">
                       <div className="relative w-full aspect-square">
                         <img
-                          src={editingProduct.images[0]}
+                          src={getIPFSUrl(editingProduct.images[0])}
                           alt="Preview"
                           className="w-full h-full object-cover"
                           onError={() => {
@@ -1983,7 +2003,7 @@ export default function StoreEditor() {
 
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {storeData.products.map((product) => {
-              const productImage = product.images.length > 0 ? product.images[0] : 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+              const productImage = product.images.length > 0 ? getIPFSUrl(product.images[0]) : 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
               const productCategory = product.metadata?.category || 'General';
               
               return (
