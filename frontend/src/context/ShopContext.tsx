@@ -353,7 +353,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
         shopAddress,
         product.name,
         product.price,
-        100, // Default stock
+        product.stock,
         product.description,
         product.images
       );
@@ -414,6 +414,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
           name: item.name || '',
           description: item.description || '',
           price: parseFloat(ethers.formatUnits(item.price || 0, 18)),
+          stock: item.stock || 0,
           images: item.ipfsHash || [],
           metadata: {
             sku: item.id,

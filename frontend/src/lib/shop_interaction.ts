@@ -495,7 +495,7 @@ export async function addItemToShop(shopAddress: string = DUMMY_SHOP_ADDRESS,
 			name: itemName,
 			description: description,
 			price: ethers.parseUnits(itemPrice.toString(), 18),
-			stock: itemStock,
+			stock: itemStock ? itemStock : 0,
 			isActive: true,
 			createdAt: timestamp,  // Now a string
 			updatedAt: timestamp,  // Now a string

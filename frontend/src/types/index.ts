@@ -84,6 +84,7 @@ export interface Product {
   name: string;
   description: string;
   price: number;
+  stock: number;
   images: string[]; // IPFS hashes
   metadata: {
     sku?: string;

@@ -39,6 +39,7 @@ export default function AddProductPage() {
     price: '',
     category: 'Electronics',
     image: '',
+    stock: 0,
   });
 
   const categories = [
@@ -88,13 +89,22 @@ export default function AddProductPage() {
           templateId: '',
           userId: '',
           customization: {
+            storeName: "placeholder",
+            heroTitle: "placeholder",
+            heroSubtitle: "placeholder",
+            heroImage: "placeholder",
+            aboutText: "placeholder",
+            contactEmail: "placeholder",
+            products: [],
+            categories: [],
+            accentColor: '#d4af37',
             primaryColor: '#1a1a1a',
             secondaryColor: '#d4af37',
-            layout: [],
-            fonts: {
-              heading: 'Inter',
-              body: 'Inter',
-            },
+            // layout: [],
+            // fonts: {
+            //   heading: 'Inter',
+            //   body: 'Inter',
+            // },
           },
           isPublished: false,
           createdAt: new Date(),
@@ -262,6 +272,7 @@ export default function AddProductPage() {
         name: productData.name,
         storeId: currentStore.id,
         price: price,
+        stock: productData.stock,
         description: productData.description,
         images: imageHash ? [imageHash] : [], // Pass IPFS hash instead of base64 data
         metadata: {
@@ -436,6 +447,37 @@ export default function AddProductPage() {
                 </div>
               </div>
 
+              {/* Stock Counter */}
+              <div>
+                <label className="block text-sm font-semibold text-(--onyx-dark) mb-2">
+                  Stock Quantity
+                </label>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setProductData(prev => ({ ...prev, stock: Math.max(0, prev.stock - 1) }))}
+                    className="w-12 h-12 flex items-center justify-center bg-(--onyx-grey-lighter) hover:bg-(--onyx-grey-light) text-(--onyx-dark) rounded-lg font-bold text-xl transition-colors"
+                  >
+                    −
+                  </button>
+                    <input
+                    type="number"
+                    min="0"
+                    value={productData.stock}
+                    onChange={(e) => setProductData(prev => ({ ...prev, stock: Math.max(0, parseInt(e.target.value) || 0) }))}
+                    className="input-field text-center font-semibold text-lg flex-1 max-w-16 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                  <button
+                    type="button"
+                    onClick={() => setProductData(prev => ({ ...prev, stock: prev.stock + 1 }))}
+                    className="w-12 h-12 flex items-center justify-center bg-(--onyx-stone) hover:bg-(--onyx-dark) text-white rounded-lg font-bold text-xl transition-colors"
+                  >
+                    +
+                  </button>
+                  <span className="text-sm text-(--onyx-grey) ml-2">units available</span>
+                </div>
+              </div>
+
               {/* Product Image */}
               <div>
                 <label className="block text-sm font-semibold text-(--onyx-dark) mb-3">
@@ -464,7 +506,7 @@ export default function AddProductPage() {
                     </div>
                   </div>
                 )}
-
+                
                 {/* File Upload Button */}
                 <div className="flex gap-3 mb-3">
                   <input
