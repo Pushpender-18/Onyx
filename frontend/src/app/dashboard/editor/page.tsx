@@ -27,7 +27,7 @@ import {
 } from 'phosphor-react';
 import { TEMPLATES, DEFAULT_TEMPLATE, type TemplateConfig } from '../templateConfig';
 import { SavePublishModal } from '@/components/SavePublishModal';
-import { publishShop, updateShopConfiguration } from '@/lib/shop_interaction';
+import { isShopPublished, publishShop, updateShopConfiguration } from '@/lib/shop_interaction';
 import { getIPFSUrl } from '@/lib/ipfs-upload';
 
 type PageType = 'home' | 'shop' | 'product' | 'about' | 'contact' | 'cart' | 'checkout';
@@ -38,16 +38,16 @@ export default function StoreEditor() {
   const storeName = searchParams.get('storeName') || 'My Store';
   const storeId = searchParams.get('storeId'); // Get storeId from URL
   const templateId = (searchParams.get('template') || 'minimal') as keyof typeof TEMPLATES;
-  
+
   // Use Shop context for blockchain operations
   const { stores, products: blockchainProducts, addProduct: addProductToBlockchain, getProducts, getStoreByName } = useShop();
   const [currentStore, setCurrentStore] = useState<StoreType | null>(null);
   const [loadingStore, setLoadingStore] = useState(false);
   const [hasLoadedStore, setHasLoadedStore] = useState(false); // Flag to prevent re-loading
-  
+
   // Load the selected template or use default
   const selectedTemplate: TemplateConfig = TEMPLATES[templateId] || DEFAULT_TEMPLATE;
-  
+
   const [storeData, setStoreData] = useState<StoreData>({
     storeName: storeName,
     heroTitle: selectedTemplate.heroTitle,
@@ -91,10 +91,10 @@ export default function StoreEditor() {
       setLoadingStore(true);
       try {
         console.log('🔄 Loading store data for editor...');
-        
+
         // Find store by ID or name
         let foundStore: StoreType | null = null;
-        
+
         if (storeId) {
           foundStore = stores.find(s => s.id === storeId) || null;
         } else {
@@ -114,7 +114,7 @@ export default function StoreEditor() {
           console.log(' Loaded products:', storeProducts);
 
           // No conversion needed - storeProducts is already Product[]
-          
+
           console.log(data?.customization);
 
           setStoreData(prev => ({
@@ -128,7 +128,7 @@ export default function StoreEditor() {
             primaryColor: data?.customization.primaryColor || prev.primaryColor,
             products: storeProducts, // Use directly instead of converting
           }));
-          
+
           setHasLoadedStore(true); // Mark as loaded
         }
       } catch (error) {
@@ -186,6 +186,7 @@ export default function StoreEditor() {
           name: updatedProduct.name,
           storeId: currentStore.id,
           price: updatedProduct.price,
+          stock: updatedProduct.stock,
           description: updatedProduct.description,
           images: updatedProduct.images,
           metadata: updatedProduct.metadata,
@@ -237,7 +238,7 @@ export default function StoreEditor() {
       toast.error('Store not loaded. Please refresh the page.');
       return;
     }
-    
+
     // Navigate to the Add Product page with store info
     const currentUrl = window.location.pathname + window.location.search;
     router.push(`/dashboard/products/add?storeId=${currentStore.id}&storeName=${encodeURIComponent(currentStore.name)}&returnUrl=${encodeURIComponent(currentUrl)}`);
@@ -256,43 +257,46 @@ export default function StoreEditor() {
       console.log(' Publishing store to blockchain...');
       console.log('Store address:', currentStore.id);
       console.log('Store name:', finalStoreName);
-      
+
       // Update toast to show MetaMask is needed
       toast.loading('Please confirm transaction in MetaMask...', { id: loadingToast });
-      
-      
+
       // Call blockchain function to publish the shop
-      const result = await publishShop(currentStore.id);
+      const isPublished = await isShopPublished(currentStore.id);
       
-      
+      if (!isPublished) {
+        const result = await publishShop(currentStore.id);
+      }
+
       // Save UI customization data to localStorage for quick access
       const uiCustomization = {
         storeName: finalStoreName,
-          heroTitle: storeData.heroTitle,
-          heroSubtitle: storeData.heroSubtitle,
-          heroImage: storeData.heroImage,
-          aboutText: storeData.aboutText,
-          contactEmail: storeData.contactEmail,
-          primaryColor: storeData.primaryColor,
-          secondaryColor: storeData.secondaryColor,
-          accentColor: storeData.accentColor,
-          textColor: storeData.textColor,
-          products: storeData.products,
-          categories: storeData.categories,
-        };
+        heroTitle: storeData.heroTitle,
+        heroSubtitle: storeData.heroSubtitle,
+        heroImage: storeData.heroImage,
+        aboutText: storeData.aboutText,
+        contactEmail: storeData.contactEmail,
+        primaryColor: storeData.primaryColor,
+        secondaryColor: storeData.secondaryColor,
+        accentColor: storeData.accentColor,
+        textColor: storeData.textColor,
+        products: storeData.products,
+        categories: storeData.categories,
+      };
       
-      const uiCustomizationString = JSON.stringify(uiCustomization);
+      console.log(uiCustomization);
+      const uiCustomizationString =  JSON.stringify(uiCustomization);
 
       // Update configuration on blockchain
       console.log('🔧 Updating shop configuration...');
       const configUpdated = await updateShopConfiguration(currentStore.id, uiCustomizationString, currentStore.name);
-      
+
       if (!configUpdated) {
         throw new Error('Failed to update shop configuration');
       }
-      
+
       console.log(' Configuration updated successfully');
-      
+
       // Save to localStorage for quick access
       localStorage.setItem(
         `onyx-ui-${currentStore.id}`,
@@ -307,7 +311,7 @@ export default function StoreEditor() {
       }, 2000);
     } catch (error: any) {
       console.error(' Error publishing store:', error);
-      
+
       let errorMessage = 'Failed to publish store';
       if (error.message?.includes('rejected')) {
         errorMessage = 'Transaction rejected';
@@ -320,7 +324,7 @@ export default function StoreEditor() {
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
+
       toast.error(errorMessage, { id: loadingToast });
     }
   };
@@ -388,18 +392,18 @@ export default function StoreEditor() {
         <h2
           className="text-5xl md:text-6xl font-bold mb-4 leading-tight"
           style={{ color: storeData.textColor }}
-          >
+        >
           {storeData.heroTitle}
         </h2>
         <p
           className="text-lg md:text-xl mb-8 max-w-2xl font-light"
           style={{ color: '#cbd5e1' }}
-          >
+        >
           {storeData.heroSubtitle}
         </p>
         <button
           className="px-8 py-3 rounded-lg font-semibold transition-all hover:shadow-2xl"
-          style={{ 
+          style={{
             backgroundColor: storeData.accentColor,
             color: storeData.primaryColor
           }}
@@ -415,7 +419,7 @@ export default function StoreEditor() {
   const CategoryFilter = () => (
     <div
       className="py-8 border-b"
-      style={{ 
+      style={{
         background: `linear-gradient(180deg, ${storeData.secondaryColor} 0%, ${storeData.primaryColor} 100%)`
       }}
     >
@@ -430,11 +434,10 @@ export default function StoreEditor() {
               <button
                 key={category}
                 onClick={() => setSelectedCategory(category)}
-                className={`px-5 py-3 rounded-lg font-semibold text-sm transition-all flex items-center gap-2 ${
-                  selectedCategory === category
-                    ? 'shadow-lg'
-                    : ''
-                }`}
+                className={`px-5 py-3 rounded-lg font-semibold text-sm transition-all flex items-center gap-2 ${selectedCategory === category
+                  ? 'shadow-lg'
+                  : ''
+                  }`}
                 style={{
                   backgroundColor:
                     selectedCategory === category ? storeData.accentColor : '#2d3748',
@@ -456,7 +459,7 @@ export default function StoreEditor() {
   const SearchFilterBar = () => (
     <div
       className="py-6 border-b"
-      style={{ 
+      style={{
         backgroundColor: storeData.primaryColor,
         borderColor: storeData.secondaryColor
       }}
@@ -476,7 +479,7 @@ export default function StoreEditor() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-12 pr-4 py-3 rounded-lg focus:outline-none transition-all"
-              style={{ 
+              style={{
                 backgroundColor: '#2d3748',
                 color: '#e8eaed',
                 borderColor: '#4a5568',
@@ -513,7 +516,7 @@ export default function StoreEditor() {
                   <label className="block text-xs font-bold mb-2 uppercase" style={{ color: '#a0aec0' }}>
                     Sort By
                   </label>
-                  <select className="w-full px-3 py-2 rounded text-sm" style={{ 
+                  <select className="w-full px-3 py-2 rounded text-sm" style={{
                     backgroundColor: '#1a1f3a',
                     color: '#e8eaed',
                     border: '1px solid #4a5568'
@@ -550,10 +553,10 @@ export default function StoreEditor() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredProducts.map((product) => {
-              const productImage =  product.images.length > 0 ? getIPFSUrl(product.images[0]) : 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+              const productImage = product.images.length > 0 ? getIPFSUrl(product.images[0]) : 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
               const productCategory = product.metadata?.category || 'General';
               const productBadge = product.isPublished ? undefined : 'Draft';
-              
+
               return (
                 <motion.div
                   key={product.id}
@@ -608,7 +611,7 @@ export default function StoreEditor() {
                     <div className="mb-3 flex items-center gap-2">
                       <span
                         className="inline-block text-xs font-bold px-3 py-1 rounded-full"
-                        style={{ 
+                        style={{
                           backgroundColor: storeData.accentColor,
                           color: storeData.primaryColor
                         }}
@@ -616,7 +619,7 @@ export default function StoreEditor() {
                         {productCategory}
                       </span>
                       {productBadge && (
-                        <span className="text-xs font-bold px-3 py-1 rounded-full" style={{ 
+                        <span className="text-xs font-bold px-3 py-1 rounded-full" style={{
                           backgroundColor: '#4a5568',
                           color: '#fbbf24'
                         }}>
@@ -635,7 +638,7 @@ export default function StoreEditor() {
                       </span>
                       <button
                         className="px-4 py-2 rounded-lg font-semibold text-sm transition-all hover:shadow-lg"
-                        style={{ 
+                        style={{
                           backgroundColor: storeData.accentColor,
                           color: storeData.primaryColor
                         }}
@@ -660,7 +663,7 @@ export default function StoreEditor() {
   // Product Detail Page
   const ProductDetailPage = () => {
     if (!selectedProduct) return null;
-    
+
     const productImage = selectedProduct.images && selectedProduct.images.length > 0 ? getIPFSUrl(selectedProduct.images[0]) : 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
     const productCategory = selectedProduct.metadata?.category || 'General';
 
@@ -840,7 +843,7 @@ export default function StoreEditor() {
                 type="text"
                 className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
                 placeholder="Your name"
-                style={{ 
+                style={{
                   '--tw-ring-color': storeData.accentColor,
                   borderColor: '#2d3748',
                   backgroundColor: '#1a1f3a',
@@ -854,7 +857,7 @@ export default function StoreEditor() {
                 type="email"
                 className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
                 placeholder="your@email.com"
-                style={{ 
+                style={{
                   '--tw-ring-color': storeData.accentColor,
                   borderColor: '#2d3748',
                   backgroundColor: '#1a1f3a',
@@ -868,7 +871,7 @@ export default function StoreEditor() {
                 className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
                 placeholder="Your message"
                 rows={6}
-                style={{ 
+                style={{
                   '--tw-ring-color': storeData.accentColor,
                   borderColor: '#2d3748',
                   backgroundColor: '#1a1f3a',
@@ -945,7 +948,7 @@ export default function StoreEditor() {
                 <div className="space-y-4">
                   {cartProducts.map((item) => {
                     const itemImage = item.images && item.images.length > 0 ? getIPFSUrl(item.images[0]) : 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
-                    
+
                     return (
                       <div
                         key={item.id}
@@ -1064,7 +1067,7 @@ export default function StoreEditor() {
                     type="text"
                     placeholder="First Name"
                     className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
-                    style={{ 
+                    style={{
                       '--tw-ring-color': storeData.accentColor,
                       borderColor: '#2d3748',
                       backgroundColor: '#0a0e27',
@@ -1075,7 +1078,7 @@ export default function StoreEditor() {
                     type="text"
                     placeholder="Last Name"
                     className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
-                    style={{ 
+                    style={{
                       '--tw-ring-color': storeData.accentColor,
                       borderColor: '#2d3748',
                       backgroundColor: '#0a0e27',
@@ -1087,7 +1090,7 @@ export default function StoreEditor() {
                   type="email"
                   placeholder="Email"
                   className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
-                  style={{ 
+                  style={{
                     '--tw-ring-color': storeData.accentColor,
                     borderColor: '#2d3748',
                     backgroundColor: '#0a0e27',
@@ -1098,7 +1101,7 @@ export default function StoreEditor() {
                   type="text"
                   placeholder="Address"
                   className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
-                  style={{ 
+                  style={{
                     '--tw-ring-color': storeData.accentColor,
                     borderColor: '#2d3748',
                     backgroundColor: '#0a0e27',
@@ -1110,7 +1113,7 @@ export default function StoreEditor() {
                     type="text"
                     placeholder="City"
                     className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
-                    style={{ 
+                    style={{
                       '--tw-ring-color': storeData.accentColor,
                       borderColor: '#2d3748',
                       backgroundColor: '#0a0e27',
@@ -1121,7 +1124,7 @@ export default function StoreEditor() {
                     type="text"
                     placeholder="State"
                     className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
-                    style={{ 
+                    style={{
                       '--tw-ring-color': storeData.accentColor,
                       borderColor: '#2d3748',
                       backgroundColor: '#0a0e27',
@@ -1132,7 +1135,7 @@ export default function StoreEditor() {
                     type="text"
                     placeholder="ZIP Code"
                     className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
-                    style={{ 
+                    style={{
                       '--tw-ring-color': storeData.accentColor,
                       borderColor: '#2d3748',
                       backgroundColor: '#0a0e27',
@@ -1146,7 +1149,7 @@ export default function StoreEditor() {
                   type="text"
                   placeholder="Cardholder Name"
                   className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
-                  style={{ 
+                  style={{
                     '--tw-ring-color': storeData.accentColor,
                     borderColor: '#2d3748',
                     backgroundColor: '#0a0e27',
@@ -1157,7 +1160,7 @@ export default function StoreEditor() {
                   type="text"
                   placeholder="Card Number"
                   className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
-                  style={{ 
+                  style={{
                     '--tw-ring-color': storeData.accentColor,
                     borderColor: '#2d3748',
                     backgroundColor: '#0a0e27',
@@ -1169,7 +1172,7 @@ export default function StoreEditor() {
                     type="text"
                     placeholder="MM/YY"
                     className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
-                    style={{ 
+                    style={{
                       '--tw-ring-color': storeData.accentColor,
                       borderColor: '#2d3748',
                       backgroundColor: '#0a0e27',
@@ -1180,7 +1183,7 @@ export default function StoreEditor() {
                     type="text"
                     placeholder="CVV"
                     className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
-                    style={{ 
+                    style={{
                       '--tw-ring-color': storeData.accentColor,
                       borderColor: '#2d3748',
                       backgroundColor: '#0a0e27',
@@ -1308,8 +1311,8 @@ export default function StoreEditor() {
                 <select
                   value={productCategory}
                   onChange={(e) =>
-                    setEditingProduct({ 
-                      ...editingProduct, 
+                    setEditingProduct({
+                      ...editingProduct,
                       metadata: { ...editingProduct.metadata, category: e.target.value }
                     })
                   }
@@ -1347,8 +1350,8 @@ export default function StoreEditor() {
                     type="text"
                     value={productImage}
                     onChange={(e) =>
-                      setEditingProduct({ 
-                        ...editingProduct, 
+                      setEditingProduct({
+                        ...editingProduct,
                         images: [e.target.value]
                       })
                     }
@@ -1443,22 +1446,20 @@ export default function StoreEditor() {
                   setImageUploadMode('upload');
                   setUploadedImage(null);
                 }}
-                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                  imageUploadMode === 'upload'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all ${imageUploadMode === 'upload'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
               >
                 <Upload size={18} className="inline mr-2" />
                 Upload from Computer
               </button>
               <button
                 onClick={() => setImageUploadMode('url')}
-                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                  imageUploadMode === 'url'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all ${imageUploadMode === 'url'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
               >
                 Use Image URL
               </button>
@@ -1835,233 +1836,233 @@ export default function StoreEditor() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Editor Header */}
-      <div className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => router.back()}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <ArrowLeft size={20} weight="bold" />
-              </button>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Store Editor</h1>
-                <p className="text-sm text-gray-500">{storeName}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setIsPreviewMode(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg font-semibold transition-colors"
-              >
-                <Eye size={18} weight="bold" />
-                Preview
-              </button>
-              <button
-                onClick={() => setShowSavePublishModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg font-semibold transition-colors"
-              >
-                <FloppyDisk size={18} weight="bold" />
-                Save & Publish
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-hidden flex gap-6 p-6">
-        {/* Left Sidebar - Settings */}
-        <div className="w-80 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="font-bold text-gray-900">Store Settings</h3>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">Store Name</label>
-              <input
-                type="text"
-                value={storeData.storeName}
-                onChange={(e) => updateStoreData({ storeName: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">Hero Title</label>
-              <textarea
-                value={storeData.heroTitle}
-                onChange={(e) => updateStoreData({ heroTitle: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                rows={2}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">Hero Subtitle</label>
-              <textarea
-                value={storeData.heroSubtitle}
-                onChange={(e) => updateStoreData({ heroSubtitle: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                rows={2}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">Hero Image URL</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={storeData.heroImage}
-                  onChange={(e) => updateStoreData({ heroImage: e.target.value })}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="https://..."
-                />
+        {/* Editor Header */}
+        <div className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+          <div className="max-w-7xl mx-auto px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
                 <button
-                  onClick={() => {
-                    setShowHeroImageUploadModal(true);
-                    setIsHeroImageUpload(true);
-                  }}
-                  className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  onClick={() => router.back()}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                 >
-                  <Upload size={16} />
-                  Upload
+                  <ArrowLeft size={20} weight="bold" />
+                </button>
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">Store Editor</h1>
+                  <p className="text-sm text-gray-500">{storeName}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setIsPreviewMode(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg font-semibold transition-colors"
+                >
+                  <Eye size={18} weight="bold" />
+                  Preview
+                </button>
+                <button
+                  onClick={() => setShowSavePublishModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg font-semibold transition-colors"
+                >
+                  <FloppyDisk size={18} weight="bold" />
+                  Save & Publish
                 </button>
               </div>
             </div>
+          </div>
+        </div>
 
-            <div>
-              <label className="block text-sm font-semibold mb-3">About Text</label>
-              <textarea
-                value={storeData.aboutText}
-                onChange={(e) => updateStoreData({ aboutText: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                rows={2}
-              />
+        <div className="flex-1 overflow-hidden flex gap-6 p-6">
+          {/* Left Sidebar - Settings */}
+          <div className="w-80 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="font-bold text-gray-900">Store Settings</h3>
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold mb-3">Contact Email</label>
-              <input
-                type="email"
-                value={storeData.contactEmail}
-                onChange={(e) => updateStoreData({ contactEmail: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">Store Name</label>
+                <input
+                  type="text"
+                  value={storeData.storeName}
+                  onChange={(e) => updateStoreData({ storeName: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-semibold mb-3">Colors</label>
-              <div className="space-y-3">
-                {[
-                  { label: 'Primary Color', key: 'primaryColor' as const },
-                  { label: 'Secondary Color', key: 'secondaryColor' as const },
-                  { label: 'Accent Color', key: 'accentColor' as const },
-                ].map((color) => (
-                  <div key={color.key}>
-                    <label className="text-xs text-gray-600 mb-1 block">{color.label}</label>
-                    <input
-                      type="color"
-                      value={storeData[color.key]}
-                      onChange={(e) => updateStoreData({ [color.key]: e.target.value })}
-                      className="w-full h-10 rounded cursor-pointer"
-                    />
-                  </div>
-                ))}
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">Hero Title</label>
+                <textarea
+                  value={storeData.heroTitle}
+                  onChange={(e) => updateStoreData({ heroTitle: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={2}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">Hero Subtitle</label>
+                <textarea
+                  value={storeData.heroSubtitle}
+                  onChange={(e) => updateStoreData({ heroSubtitle: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={2}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">Hero Image URL</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={storeData.heroImage}
+                    onChange={(e) => updateStoreData({ heroImage: e.target.value })}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="https://..."
+                  />
+                  <button
+                    onClick={() => {
+                      setShowHeroImageUploadModal(true);
+                      setIsHeroImageUpload(true);
+                    }}
+                    className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  >
+                    <Upload size={16} />
+                    Upload
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-3">About Text</label>
+                <textarea
+                  value={storeData.aboutText}
+                  onChange={(e) => updateStoreData({ aboutText: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={2}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-3">Contact Email</label>
+                <input
+                  type="email"
+                  value={storeData.contactEmail}
+                  onChange={(e) => updateStoreData({ contactEmail: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-3">Colors</label>
+                <div className="space-y-3">
+                  {[
+                    { label: 'Primary Color', key: 'primaryColor' as const },
+                    { label: 'Secondary Color', key: 'secondaryColor' as const },
+                    { label: 'Accent Color', key: 'accentColor' as const },
+                  ].map((color) => (
+                    <div key={color.key}>
+                      <label className="text-xs text-gray-600 mb-1 block">{color.label}</label>
+                      <input
+                        type="color"
+                        value={storeData[color.key]}
+                        onChange={(e) => updateStoreData({ [color.key]: e.target.value })}
+                        className="w-full h-10 rounded cursor-pointer"
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Center - Preview */}
-        <div className="flex-1 overflow-auto bg-white rounded-lg shadow-sm border border-gray-200">
-          <div className="min-h-full" style={{ backgroundColor: storeData.primaryColor }}>
-            <Navbar />
-            <div className="max-w-7xl mx-auto px-6 py-8">
-              {renderStorePage()}
-              <div className="mt-16">
-                <Footer />
+          {/* Center - Preview */}
+          <div className="flex-1 overflow-auto bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="min-h-full" style={{ backgroundColor: storeData.primaryColor }}>
+              <Navbar />
+              <div className="max-w-7xl mx-auto px-6 py-8">
+                {renderStorePage()}
+                <div className="mt-16">
+                  <Footer />
+                </div>
               </div>
+            </div>
+          </div>
+
+          {/* Right Sidebar - Products Manager */}
+          <div className="w-80 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="font-bold text-gray-900">Products ({storeData.products.length})</h3>
+              <button
+                onClick={addNewProduct}
+                className="p-2 hover:bg-gray-100 rounded-lg text-blue-600"
+                title="Add new product"
+              >
+                <Plus size={20} weight="bold" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {storeData.products.map((product) => {
+                const productImage = product.images.length > 0 ? getIPFSUrl(product.images[0]) : 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+                const productCategory = product.metadata?.category || 'General';
+
+                return (
+                  <motion.div
+                    key={product.id}
+                    className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors group"
+                    whileHover={{ scale: 1.02 }}
+                  >
+                    <div className="flex gap-3 items-start">
+                      <img
+                        src={productImage}
+                        alt={product.name}
+                        className="w-12 h-12 rounded object-cover shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-semibold text-gray-900 truncate">
+                          {product.name}
+                        </h4>
+                        <p className="text-xs text-gray-500">${product.price.toFixed(2)}</p>
+                        <span className="text-xs text-gray-600">{productCategory}</span>
+                      </div>
+                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => {
+                            setEditingProduct(product);
+                            setShowProductModal(true);
+                          }}
+                          className="p-1 hover:bg-blue-100 text-blue-600 rounded"
+                          title="Edit"
+                        >
+                          <PencilSimple size={16} weight="bold" />
+                        </button>
+                        <button
+                          onClick={() => deleteProduct(product.id)}
+                          className="p-1 hover:bg-red-100 text-red-600 rounded"
+                          title="Delete"
+                        >
+                          <Trash size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
             </div>
           </div>
         </div>
 
-        {/* Right Sidebar - Products Manager */}
-        <div className="w-80 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col">
-          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-            <h3 className="font-bold text-gray-900">Products ({storeData.products.length})</h3>
-            <button
-              onClick={addNewProduct}
-              className="p-2 hover:bg-gray-100 rounded-lg text-blue-600"
-              title="Add new product"
-            >
-              <Plus size={20} weight="bold" />
-            </button>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {storeData.products.map((product) => {
-              const productImage = product.images.length > 0 ? getIPFSUrl(product.images[0]) : 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
-              const productCategory = product.metadata?.category || 'General';
-              
-              return (
-                <motion.div
-                  key={product.id}
-                  className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors group"
-                  whileHover={{ scale: 1.02 }}
-                >
-                  <div className="flex gap-3 items-start">
-                    <img
-                      src={productImage}
-                      alt={product.name}
-                      className="w-12 h-12 rounded object-cover shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-sm font-semibold text-gray-900 truncate">
-                        {product.name}
-                      </h4>
-                      <p className="text-xs text-gray-500">${product.price.toFixed(2)}</p>
-                      <span className="text-xs text-gray-600">{productCategory}</span>
-                    </div>
-                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => {
-                          setEditingProduct(product);
-                          setShowProductModal(true);
-                        }}
-                        className="p-1 hover:bg-blue-100 text-blue-600 rounded"
-                        title="Edit"
-                      >
-                        <PencilSimple size={16} weight="bold" />
-                      </button>
-                      <button
-                        onClick={() => deleteProduct(product.id)}
-                        className="p-1 hover:bg-red-100 text-red-600 rounded"
-                        title="Delete"
-                      >
-                        <Trash size={16} />
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
-        </div>
+        <ProductEditModal />
+        <ImageUploadModal />
+        <HeroImageUploadModal />
+        <SavePublishModal
+          isOpen={showSavePublishModal}
+          onClose={() => setShowSavePublishModal(false)}
+          onPublish={handlePublish}
+          initialStoreName={storeData.storeName}
+        />
       </div>
-
-      <ProductEditModal />
-      <ImageUploadModal />
-      <HeroImageUploadModal />
-      <SavePublishModal
-        isOpen={showSavePublishModal}
-        onClose={() => setShowSavePublishModal(false)}
-        onPublish={handlePublish}
-        initialStoreName={storeData.storeName}
-      />
-    </div>
     </ProtectedRoute>
   );
 }
