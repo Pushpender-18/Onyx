@@ -1,4 +1,5 @@
 import { ethers } from "ethers";
+import { v4 as uuidV4 } from "uuid";
 import Master from "@/abi/Master.json";
 import Shop from "@/abi/Shop.json";
 import { create } from "domain";
@@ -487,8 +488,10 @@ export async function addItemToShop(shopAddress: string = DUMMY_SHOP_ADDRESS,
 		
 		const timestamp = Math.floor(Date.now() / 1000).toString(); // Convert to string
 		
+		const _id = uuidV4(); // Generate unique ID for the item
+
 		const _itemDetails = {
-			id: "genThisLater",
+			id: _id,
 			name: itemName,
 			description: description,
 			price: ethers.parseUnits(itemPrice.toString(), 18),
