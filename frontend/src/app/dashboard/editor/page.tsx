@@ -284,7 +284,13 @@ export default function StoreEditor() {
         categories: storeData.categories,
       };
       
-      console.log(uiCustomization);
+      // Convert all product stock values to integers
+      uiCustomization.products = uiCustomization.products.map(product => ({
+        ...product,
+        stock: parseInt(product.stock.toString())
+      }));
+
+      console.log(uiCustomization.products);
       const uiCustomizationString =  JSON.stringify(uiCustomization);
 
       // Update configuration on blockchain
