@@ -55,6 +55,33 @@ export default function PublishedStorePage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
+  // Load cart items from cache on mount
+  useEffect(() => {
+    if (storeName) {
+      const cacheKey = `cart_${storeName}`;
+      const cachedCart = localStorage.getItem(cacheKey);
+      if (cachedCart) {
+        try {
+          const parsedCart = JSON.parse(cachedCart);
+          setCartItems(parsedCart);
+          console.log('📦 Loaded cart from cache:', parsedCart);
+        } catch (error) {
+          console.error('❌ Error parsing cached cart:', error);
+          localStorage.removeItem(cacheKey);
+        }
+      }
+    }
+  }, [storeName]);
+
+  // Save cart items to cache whenever they change
+  useEffect(() => {
+    if (storeName && cartItems.length >= 0) {
+      const cacheKey = `cart_${storeName}`;
+      localStorage.setItem(cacheKey, JSON.stringify(cartItems));
+      console.log('💾 Saved cart to cache:', cartItems);
+    }
+  }, [cartItems, storeName]);
+
   useEffect(() => {
     const loadStore = async () => {
       setLoading(true);
@@ -259,6 +286,11 @@ export default function PublishedStorePage() {
       // Clear cart after successful checkout
       setCartItems([]);
       setCartOpen(false);
+      
+      // Clear cart from cache
+      const cacheKey = `cart_${storeName}`;
+      localStorage.removeItem(cacheKey);
+      console.log('🗑️ Cleared cart cache after successful checkout');
       
       toast.success('Order placed successfully! 🎉', { id: toastId });
       toast.success('You will receive confirmation shortly');
