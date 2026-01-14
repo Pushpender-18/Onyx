@@ -32,7 +32,8 @@ interface ShopContextType {
   getAllStores: () => Promise<Store[]>;
   getStoreByName: (name: string) => Promise<Store | null>;
   updateStore: (storeId: string, updates: Partial<Store>) => void;
-  updateConfiguration: (shopName: string, shopAddress: string, configuration: string) => Promise<boolean>;
+  updateConfiguration: (shopName: string, shopAddress: string, configuration: string, newShopName: string) => Promise<boolean>;
+  updateShopName: (shopAddress: string, oldName: string, newName: string) => Promise<boolean>;
   deleteStore: (storeId: string) => void;
   restoreStore: (storeId: string) => Promise<void>;
   getDeletedStoreIds: () => Set<string>;
@@ -283,15 +284,21 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   };
 
   // Update configuration on blockchain and local state
-  const updateConfiguration = async (shopName: string, shopAddress: string, configuration: string): Promise<boolean> => {
+  const updateConfiguration = async (shopName: string, shopAddress: string, configuration: string, newShopNaame: string): Promise<boolean> => {
     setIsLoading(true);
     setError(null);
 
     try {
       console.log('🔧 Updating configuration for shop:', shopName, shopAddress);
       
+      console.log(shopName, newShopNaame);
       // Call blockchain function with shopName
-      await shopInteraction.updateShopConfiguration(shopAddress, configuration, shopName);
+      if (shopName !== newShopNaame) {
+        console.log(' Shop name has changed. Updating to new name:', newShopNaame);
+        await updateShopName(shopAddress, shopName, newShopNaame);
+      }
+
+      await shopInteraction.updateShopConfiguration(shopAddress, configuration, newShopNaame);
       console.log(' Configuration updated on blockchain');
       
       // Update local state
@@ -637,6 +644,55 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Update shop name on blockchain (write operation - requires correct network)
+  const updateShopName = async (shopAddress: string, oldName: string, newName: string): Promise<boolean> => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      console.log('✏️ Updating shop name:', oldName, '->', newName);
+      console.log('📍 Shop address:', shopAddress);
+      
+      // Call blockchain function to update shop name in Master contract
+      await shopInteraction.updateShopName(shopAddress, oldName, newName);
+      console.log('✅ Shop name updated on blockchain');
+      
+      // Update local state
+      setStores((prev) =>
+        prev.map((store) =>
+          store.id === shopAddress
+            ? {
+                ...store,
+                name: newName,
+                updatedAt: new Date(),
+              }
+            : store
+        )
+      );
+      
+      console.log('✅ Shop name updated in local state');
+      setIsLoading(false);
+      return true;
+    } catch (err: any) {
+      console.error('❌ Error updating shop name:', err);
+      
+      let errorMessage = 'Failed to update shop name';
+      if (err.message?.includes('Wallet not connected')) {
+        errorMessage = 'Please connect your wallet first';
+      } else if (err.message?.includes('rejected')) {
+        errorMessage = 'Transaction rejected by user';
+      } else if (err.message?.includes('Only shop owner')) {
+        errorMessage = 'Only the shop owner can update the name';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      setIsLoading(false);
+      return false;
+    }
+  };
+
   // Refresh all data from blockchain
   const refreshData = async () => {
     await getAllStores();
@@ -653,6 +709,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     getStoreByName,
     updateStore,
     updateConfiguration,
+    updateShopName,
     deleteStore,
     restoreStore,
     getDeletedStoreIds,

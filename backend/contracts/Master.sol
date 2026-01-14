@@ -26,6 +26,29 @@ contract Master {
         return allShopNames;
     }
 
+    // Update shop name
+    function updateShopName(
+        address _shopAddress,
+        string calldata _oldName,
+        string calldata _newName
+    ) external { 
+        require(
+            shopOwnerRegistry[_shopAddress] == msg.sender,
+            "Only shop owner can update the name"
+        ); 
+
+        for (uint256 i = 0; i < allShopNames.length; i++) {
+            if (
+                keccak256(abi.encodePacked(allShopNames[i])) ==
+                keccak256(abi.encodePacked(_oldName))
+            ) {
+                allShopNames[i] = _newName;
+                return;
+            }
+        }
+
+    }
+
     // Retrieves the shop address associated with a specific name.
     function getShopByName(
         string calldata _name

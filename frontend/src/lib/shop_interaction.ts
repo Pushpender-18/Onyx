@@ -5,7 +5,6 @@ import { create } from "domain";
 import { CURRENT_NETWORK } from "./network-config";
 
 const MASTER_CONTRACT_ADDRESS = CURRENT_NETWORK.masterContractAddress;
-const DUMMY_SHOP_ADDRESS = "0xa16E02E87b7454126E5E10d957A927A7F5B5d2be";
 
 // Check if connected to correct network
 // Returns true if on correct network, false otherwise
@@ -478,7 +477,7 @@ export async function getShopOwner(shopName: string): Promise<string> {
 
 // shopAddress to be given during actual usage
 // Add Items in the shop (write operation - requires correct network)
-export async function addItemToShop(shopAddress: string = DUMMY_SHOP_ADDRESS,
+export async function addItemToShop(shopAddress: string,
 	itemName: string, itemPrice: number, itemStock: number, description: string,
 	ipfsHash: string[]) {
 	try {
@@ -608,7 +607,7 @@ export async function updateItemInShop(
 
 // shopAddress to be given during actual usage
 // Fetch Items from the shop (read operation - doesn't require correct network)
-export async function getItemsFromShop(shopAddress: string = DUMMY_SHOP_ADDRESS) {
+export async function getItemsFromShop(shopAddress: string) {
 	try {
 		const shopContract = await getShopContract(shopAddress, false); // Read operation
 		const items = await shopContract.getAllItems();
@@ -1000,3 +999,67 @@ export async function getTotalSalesForOwner(ownerAddress: string) {
 	}
 }
 
+// Update shop name on the Master contract (write operation - requires correct network)
+export async function updateShopName(shopAddress: string, oldName: string, newName: string) {
+	try {
+		console.log('✏️ Updating shop name in Master contract');
+		console.log('📍 Shop address:', shopAddress);
+		console.log('📝 Old name:', oldName);
+		console.log('📝 New name:', newName);
+		
+		// Check if contract exists at this address
+		const provider = await checkWalletConnection(true);
+		const code = await provider.getCode(shopAddress);
+		
+		if (code === '0x') {
+			console.error('❌ No contract found at address:', shopAddress);
+			throw new Error('Store contract not found. The Hardhat node may have been restarted. Please recreate your store.');
+		}
+		
+		const masterContract = await getMasterContract(true); // Write operation - require correct network
+		const signer = await provider.getSigner();
+		const callerAddress = await signer.getAddress();
+		
+		console.log('🔑 Caller address:', callerAddress);
+		
+		// Send transaction
+		console.log('📝 Sending update shop name transaction to blockchain...');
+		const tx = await masterContract.updateShopName(shopAddress, oldName, newName);
+		console.log('⏳ Transaction sent. Hash:', tx.hash);
+		console.log('⏳ Waiting for confirmation...');
+		
+		const receipt = await tx.wait();
+		console.log('✅ Transaction confirmed! Block:', receipt.blockNumber);
+		console.log('✅ Shop name updated successfully from', oldName, 'to', newName);
+		
+		return { success: true, txHash: tx.hash, shopAddress, oldName, newName };
+	} catch (error: any) {
+		console.error('❌ Error updating shop name:', error);
+		
+		// Provide better error messages based on error type
+		if (error.code === 'CALL_EXCEPTION') {
+			if (error.message?.includes('missing revert data')) {
+				throw new Error('Contract not found at this address. The Hardhat node may have been restarted. Please recreate your store.');
+			}
+			throw new Error('Transaction failed. You may not be the owner of this shop.');
+		}
+		
+		if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
+			throw new Error('Transaction rejected by user');
+		}
+		
+		if (error.message?.includes('insufficient funds')) {
+			throw new Error('Insufficient funds to complete transaction');
+		}
+		
+		if (error.message?.includes('Only shop owner')) {
+			throw new Error('Only the shop owner can update the name');
+		}
+		
+		if (error.message?.includes('Store contract not found')) {
+			throw error; // Re-throw our custom error with full message
+		}
+		
+		throw error;
+	}
+}
