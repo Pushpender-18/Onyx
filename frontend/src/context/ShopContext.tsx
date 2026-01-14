@@ -5,11 +5,27 @@ import { ethers } from 'ethers';
 import { Store, Product } from '@/types';
 import * as shopInteraction from '@/lib/shop_interaction';
 
+interface TotalSalesData {
+  totalSalesInWei: string;
+  totalSalesInEth: number;
+  totalOrderCount: number;
+  shopCount: number;
+  shopsData: Array<{
+    shopAddress: string;
+    totalSalesInWei: string;
+    totalSalesInEth: number;
+    orderCount: number;
+    orders: any[];
+    error?: string;
+  }>;
+}
+
 interface ShopContextType {
   stores: Store[];
   products: Product[];
   isLoading: boolean;
   error: string | null;
+  totalSalesByOwner: TotalSalesData | null;
   
   // Store operations
   createStore: (name: string, templateId: string, description: string, configuration: string) => Promise<Store | null>;
@@ -27,6 +43,9 @@ interface ShopContextType {
   updateProduct: (productId: string, updates: Partial<Product>) => void;
   deleteProduct: (productId: string) => void;
   
+  // Sales operations
+  getTotalSalesByOwner: () => Promise<TotalSalesData | null>;
+  
   // Utility
   refreshData: () => Promise<void>;
 }
@@ -39,6 +58,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [totalSalesByOwner, setTotalSalesByOwner] = useState<TotalSalesData | null>(null);
 
   // localStorage utilities for tracking deleted stores
   const DELETED_STORES_KEY = 'onyx_deleted_stores';
@@ -464,6 +484,103 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     setProducts((prev) => prev.filter((product) => product.id !== productId));
   };
 
+  // Get total sales from stores in state (blockchain read operation)
+  const getTotalSalesByOwner = async (): Promise<TotalSalesData | null> => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      console.log('💰 Fetching total sales for stores in state');
+      console.log('📊 Number of stores:', stores.length);
+      
+      if (stores.length === 0) {
+        console.log('📭 No stores found in state');
+        const emptyData: TotalSalesData = {
+          totalSalesInWei: '0',
+          totalSalesInEth: 0,
+          totalOrderCount: 0,
+          shopCount: 0,
+          shopsData: []
+        };
+        setTotalSalesByOwner(emptyData);
+        setIsLoading(false);
+        return emptyData;
+      }
+      
+      // Extract shop addresses from stores state
+      const shopAddresses = stores.map(store => store.id);
+      console.log('🏪 Shop addresses:', shopAddresses);
+      
+      // Fetch sales data for each shop
+      let overallTotalSalesInWei = BigInt(0);
+      let overallTotalOrderCount = 0;
+      const shopsData = [];
+      
+      for (const shopAddress of shopAddresses) {
+        try {
+          console.log(`📊 Fetching sales for shop: ${shopAddress}`);
+          const shopSales = await shopInteraction.getTotalSalesFromShop(shopAddress);
+          
+          // Add to overall totals
+          overallTotalSalesInWei += BigInt(shopSales.totalSalesInWei);
+          overallTotalOrderCount += shopSales.orderCount;
+          
+          shopsData.push({
+            shopAddress,
+            totalSalesInWei: shopSales.totalSalesInWei,
+            totalSalesInEth: shopSales.totalSalesInEth,
+            orderCount: shopSales.orderCount,
+            orders: shopSales.orders
+          });
+        } catch (error) {
+          console.error(` Error fetching sales for shop ${shopAddress}:`, error);
+          // Continue with other shops even if one fails
+          shopsData.push({
+            shopAddress,
+            totalSalesInWei: '0',
+            totalSalesInEth: 0,
+            orderCount: 0,
+            orders: [],
+            error: 'Failed to fetch sales data'
+          });
+        }
+      }
+      
+      // Convert total from wei to ETH
+      const overallTotalSalesInEth = Number(ethers.formatUnits(overallTotalSalesInWei.toString(), 18));
+      
+      const salesData: TotalSalesData = {
+        totalSalesInWei: overallTotalSalesInWei.toString(),
+        totalSalesInEth: overallTotalSalesInEth,
+        totalOrderCount: overallTotalOrderCount,
+        shopCount: shopAddresses.length,
+        shopsData
+      };
+      
+      console.log('✅ Overall totals:', salesData);
+      
+      // Update local state
+      setTotalSalesByOwner(salesData);
+      
+      setIsLoading(false);
+      return salesData;
+    } catch (err: any) {
+      console.error(' Error fetching total sales:', err);
+      
+      // Provide user-friendly error messages
+      let errorMessage = 'Failed to fetch total sales';
+      if (err.message?.includes('Wallet not connected')) {
+        errorMessage = 'Please connect your wallet first';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      setIsLoading(false);
+      return null;
+    }
+  };
+
   // Refresh all data from blockchain
   const refreshData = async () => {
     await getAllStores();
@@ -474,6 +591,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     products,
     isLoading,
     error,
+    totalSalesByOwner,
     createStore,
     getAllStores,
     getStoreByName,
@@ -486,6 +604,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     getProducts,
     updateProduct,
     deleteProduct,
+    getTotalSalesByOwner,
     refreshData,
   };
 

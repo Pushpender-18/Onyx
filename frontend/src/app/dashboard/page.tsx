@@ -39,7 +39,7 @@ const itemVariants = {
 export default function Dashboard() {
   const router = useRouter();
   const { user, walletAddress } = useWeb3Auth();
-  const { stores, products, getProducts, isLoading, getAllStores, refreshData } = useShop();
+  const { stores, products, getProducts, isLoading, getAllStores, refreshData, getTotalSalesByOwner, totalSalesByOwner } = useShop();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Load stores from blockchain on mount
@@ -49,6 +49,13 @@ export default function Dashboard() {
       console.log("stores:", stores);
     } else if (products.length === 0 && !isLoading) {
       getProductsAndStores();
+
+      const result = async () => {
+        const sales = await getTotalSalesByOwner();
+        console.log("Total sales by owner:", sales);
+      };
+      result();
+
     }
   }, [stores]);
 
@@ -153,7 +160,7 @@ export default function Dashboard() {
               },
               {
                 label: 'Total Sales',
-                value: `$${totalSales}`,
+                value: `$${totalSalesByOwner?.totalSalesInEth || 0}`,
                 icon: TrendUp,
               },
             ].map((stat, index) => (

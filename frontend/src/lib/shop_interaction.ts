@@ -790,3 +790,137 @@ export async function updateShopConfiguration(shopAddress: string, newConfigurat
     }
 }
 
+// Fetch all orders from a shop and calculate total sales (read operation - doesn't require correct network)
+export async function getTotalSalesFromShop(shopAddress: string) {
+	try {
+		console.log('💰 Fetching total sales from shop at:', shopAddress);
+		const shopContract = await getShopContract(shopAddress, false); // Read operation
+		
+		// Get order count first
+		const orderCount = await shopContract.orderCount();
+		console.log(' Total orders:', orderCount.toString());
+		
+		// Fetch all orders and calculate total
+		let totalSalesInWei = BigInt(0);
+		const orders = [];
+		
+		for (let i = 0; i < Number(orderCount); i++) {
+			const order = await shopContract.orders(i);
+			
+			// Convert order data to a more usable format
+			const orderData = {
+				buyer: order.buyer || order[0],
+				itemId: order.itemId || order[1],
+				quantity: Number(order.quantity || order[2]),
+				totalPrice: order.totalPrice || order[3],
+				timestamp: order.timestamp || order[4],
+				txnHash: order.txnHash || order[5],
+			};
+			
+			orders.push(orderData);
+			totalSalesInWei += BigInt(orderData.totalPrice.toString());
+		}
+		
+		// Convert total from wei to ETH
+		const totalSalesInEth = Number(ethers.formatUnits(totalSalesInWei.toString(), 18));
+		
+		console.log(' Total sales (wei):', totalSalesInWei.toString());
+		console.log(' Total sales (ETH):', totalSalesInEth);
+		
+		return {
+			totalSalesInWei: totalSalesInWei.toString(),
+			totalSalesInEth,
+			orderCount: Number(orderCount),
+			orders
+		};
+	} catch (error) {
+		console.error(' Error fetching total sales:', error);
+		throw error;
+	}
+}
+
+// Fetch all shops owned by an address and calculate total sales across all shops (read operation)
+export async function getTotalSalesForOwner(ownerAddress: string) {
+	try {
+		console.log('🏪 Fetching all shops for owner:', ownerAddress);
+		
+		// Validate owner address
+		if (!ethers.isAddress(ownerAddress)) {
+			throw new Error('Invalid owner address');
+		}
+		
+		// Get master contract to fetch shops by owner
+		const masterContract = await getMasterContract(false); // Read operation
+		
+		// Get all shop addresses owned by this address
+		const shopAddresses = await masterContract.getShopsByOwner(ownerAddress);
+		console.log(` Found ${shopAddresses.length} shops for owner`);
+		
+		if (shopAddresses.length === 0) {
+			console.log('📭 No shops found for this owner');
+			return {
+				totalSalesInWei: '0',
+				totalSalesInEth: 0,
+				totalOrderCount: 0,
+				shopCount: 0,
+				shopsData: []
+			};
+		}
+		
+		// Fetch sales data for each shop
+		let overallTotalSalesInWei = BigInt(0);
+		let overallTotalOrderCount = 0;
+		const shopsData = [];
+		
+		for (const shopAddress of shopAddresses) {
+			try {
+				console.log(`📊 Fetching sales for shop: ${shopAddress}`);
+				const shopSales = await getTotalSalesFromShop(shopAddress);
+				
+				// Add to overall totals
+				overallTotalSalesInWei += BigInt(shopSales.totalSalesInWei);
+				overallTotalOrderCount += shopSales.orderCount;
+				
+				shopsData.push({
+					shopAddress,
+					totalSalesInWei: shopSales.totalSalesInWei,
+					totalSalesInEth: shopSales.totalSalesInEth,
+					orderCount: shopSales.orderCount,
+					orders: shopSales.orders
+				});
+			} catch (error) {
+				console.error(` Error fetching sales for shop ${shopAddress}:`, error);
+				// Continue with other shops even if one fails
+				shopsData.push({
+					shopAddress,
+					totalSalesInWei: '0',
+					totalSalesInEth: 0,
+					orderCount: 0,
+					orders: [],
+					error: 'Failed to fetch sales data'
+				});
+			}
+		}
+		
+		// Convert total from wei to ETH
+		const overallTotalSalesInEth = Number(ethers.formatUnits(overallTotalSalesInWei.toString(), 18));
+		
+		console.log('✅ Overall totals:');
+		console.log(' Total sales (wei):', overallTotalSalesInWei.toString());
+		console.log(' Total sales (ETH):', overallTotalSalesInEth);
+		console.log(' Total orders:', overallTotalOrderCount);
+		console.log(' Total shops:', shopAddresses.length);
+		
+		return {
+			totalSalesInWei: overallTotalSalesInWei.toString(),
+			totalSalesInEth: overallTotalSalesInEth,
+			totalOrderCount: overallTotalOrderCount,
+			shopCount: shopAddresses.length,
+			shopsData
+		};
+	} catch (error) {
+		console.error(' Error fetching total sales for owner:', error);
+		throw error;
+	}
+}
+
