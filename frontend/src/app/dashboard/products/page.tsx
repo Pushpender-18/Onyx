@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { Plus, Trash, Pencil, Package } from 'phosphor-react';
 import { useShop } from '@/context/ShopContext';
 import { getIPFSUrl } from '@/lib/ipfs-upload';
+import { Product } from '@/types';
 
 const containerVariants = {
   hidden: { opacity: 0 },

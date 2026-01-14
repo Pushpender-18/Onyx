@@ -70,6 +70,8 @@ contract Shop {
 		require(msg.sender == shopDetails.owner, "Only owner can update products");	// Access control [Only the shop owner can update products]
 		require(_itemIndex < productCount, "Product does not exist");		// Validity check
 		
+		items[_itemIndex].name = _item.name;
+		items[_itemIndex].description = _item.description;
 		items[_itemIndex].price = _item.price;
 		items[_itemIndex].stock = _item.stock;
 		items[_itemIndex].isActive = _item.isActive;
