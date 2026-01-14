@@ -486,7 +486,7 @@ export default function PublishedStorePage() {
                   className="p-2 rounded-full text-white transition-all hover:scale-110"
                   style={{ backgroundColor: storeData.accentColor }}
                 >
-                  <ShoppingCart size={48} weight="fill" className='bg-red-500' />
+                  <ShoppingCart size={48} weight="fill" className='p-2' />
                 </button>
               </div>
             </div>
@@ -663,6 +663,50 @@ export default function PublishedStorePage() {
                       <p className="text-sm text-gray-600">
                         ${product?.price.toFixed(2)} × {item.quantity}
                       </p>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setCartItems((prev) =>
+                                prev.map((i) =>
+                                  i.id === item.id && i.quantity > 1
+                                    ? { ...i, quantity: i.quantity - 1 }
+                                    : i
+                                )
+                              );
+                            }}
+                            className="w-8 h-8 rounded-full border-2 flex items-center justify-center font-bold hover:bg-gray-100 transition-colors"
+                            style={{ borderColor: storeData.accentColor, color: storeData.accentColor }}
+                          >
+                            −
+                          </button>
+                          <span className="w-8 text-center font-semibold">{item.quantity}</span>
+                          <button
+                            onClick={() => {
+                              setCartItems((prev) =>
+                                prev.map((i) =>
+                                  i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+                                )
+                              );
+                            }}
+                            className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white hover:opacity-90 transition-opacity"
+                            style={{ backgroundColor: storeData.accentColor }}
+                          >
+                            +
+                          </button>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setCartItems((prev) => prev.filter((i) => i.id !== item.id));
+                            toast.success('Item removed from cart');
+                          }}
+                          className="text-xs text-red-500 hover:text-red-700 transition-colors"
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
