@@ -41,6 +41,7 @@ interface ShopContextType {
   addProduct: (shopAddress: string, product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Product | null>;
   getProducts: (shopAddress: string) => Promise<Product[]>;
   updateProduct: (productId: string, updates: Partial<Product>) => void;
+  updateProductOnBlockchain: (shopAddress: string, product: Product) => Promise<Product | null>;
   deleteProduct: (productId: string) => void;
   
   // Sales operations
@@ -479,6 +480,61 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     );
   };
 
+  // Update product on blockchain and local state
+  const updateProductOnBlockchain = async (
+    shopAddress: string,
+    product: Product
+  ): Promise<Product | null> => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Call blockchain function
+      const response = await shopInteraction.updateItemInShop(
+        shopAddress,
+        product.id,
+        product.name,
+        product.price,
+        product.stock,
+        product.description,
+        product.images
+      );
+
+      // Update product in local state
+      const updatedProduct: Product = {
+        ...product,
+        updatedAt: new Date(),
+      };
+
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === product.id ? updatedProduct : p
+        )
+      );
+      
+      setIsLoading(false);
+      return updatedProduct;
+    } catch (err: any) {
+      console.error('Error updating product:', err);
+      
+      // Provide user-friendly error messages
+      let errorMessage = 'Failed to update product';
+      if (err.message?.includes('Wallet not connected')) {
+        errorMessage = 'Please connect your wallet first';
+      } else if (err.message?.includes('pending')) {
+        errorMessage = 'Wallet connection request pending. Please check your wallet.';
+      } else if (err.message?.includes('rejected')) {
+        errorMessage = 'Transaction rejected by user';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      setIsLoading(false);
+      return null;
+    }
+  };
+
   // Delete product locally
   const deleteProduct = (productId: string) => {
     setProducts((prev) => prev.filter((product) => product.id !== productId));
@@ -603,6 +659,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     addProduct,
     getProducts,
     updateProduct,
+    updateProductOnBlockchain,
     deleteProduct,
     getTotalSalesByOwner,
     refreshData,

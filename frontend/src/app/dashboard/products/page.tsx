@@ -134,7 +134,7 @@ export default function ProductsPage() {
                           className="card p-6 hover:shadow-lg transition-shadow group flex flex-col"
                         >
                           {/* Product Image */}
-                          <div className="w-full h-32 rounded-lg bg-(--onyx-grey-lighter)/50 flex items-center justify-center mb-4 overflow-hidden">
+                          <div className="w-full h-80 rounded-lg bg-(--onyx-grey-lighter)/50 flex items-center justify-center mb-4 overflow-hidden">
                             {product.images && product.images.length > 0 ? (
                               <img
                                 src={getIPFSUrl(product.images[0])}
@@ -182,6 +182,7 @@ export default function ProductsPage() {
                           {/* Actions */}
                           <div className="flex items-center gap-2 justify-end pt-4 border-t border-(--onyx-grey-lighter)">
                             <motion.button
+                              onClick={() => router.push(`/dashboard/products/edit/${product.id}?storeId=${product.storeId}&returnUrl=/dashboard/products`)}
                               whileHover={{ scale: 1.1 }}
                               whileTap={{ scale: 0.9 }}
                               className="p-2 hover:bg-(--onyx-grey-lighter) rounded-lg transition-colors"

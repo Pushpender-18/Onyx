@@ -1,5 +1,4 @@
 import { ethers } from "ethers";
-import { v4 as uuidV4 } from "uuid";
 import Master from "@/abi/Master.json";
 import Shop from "@/abi/Shop.json";
 import { create } from "domain";
@@ -488,7 +487,7 @@ export async function addItemToShop(shopAddress: string = DUMMY_SHOP_ADDRESS,
 		
 		const timestamp = Math.floor(Date.now() / 1000).toString(); // Convert to string
 		
-		const _id = uuidV4(); // Generate unique ID for the item
+		const _id = `${timestamp}-${Math.random().toString(36).slice(2)}`; // Generate unique ID for the item
 
 		const _itemDetails = {
 			id: _id,
@@ -524,6 +523,83 @@ export async function addItemToShop(shopAddress: string = DUMMY_SHOP_ADDRESS,
 			throw new Error('Insufficient funds to complete transaction');
 		} else if (error.message?.includes('Only owner')) {
 			throw new Error('Only the store owner can add products');
+		}
+		
+		throw error;
+	}
+}
+
+// Update an existing product in the shop (write operation - requires correct network)
+export async function updateItemInShop(
+	shopAddress: string,
+	itemId: string,
+	itemName: string,
+	itemPrice: number,
+	itemStock: number,
+	description: string,
+	ipfsHash: string[]
+) {
+	try {
+		console.log('🔄 Getting shop contract at:', shopAddress);
+		const shopContract = await getShopContract(shopAddress, true); // Write operation - require correct network
+		
+		// Get all items to find the index of the item we're updating
+		console.log('🔍 Finding item index for ID:', itemId);
+		const allItems = await shopContract.getAllItems();
+		
+		let itemIndex = -1;
+		for (let i = 0; i < allItems.length; i++) {
+			if (allItems[i].id === itemId) {
+				itemIndex = i;
+				break;
+			}
+		}
+		
+		if (itemIndex === -1) {
+			throw new Error('Product not found in shop');
+		}
+		
+		console.log('✅ Found item at index:', itemIndex);
+		
+		const timestamp = Math.floor(Date.now() / 1000).toString(); // Convert to string
+		
+		const _itemDetails = {
+			id: itemId,
+			name: itemName,
+			description: description,
+			price: ethers.parseUnits(itemPrice.toString(), 18),
+			stock: itemStock ? itemStock : 0,
+			isActive: true,
+			createdAt: timestamp,  // Current timestamp
+			updatedAt: timestamp,  // Updated timestamp
+			ipfsHash: ipfsHash
+		};
+
+		console.log('📝 Sending update transaction to blockchain...');
+		console.log('Product details:', _itemDetails);
+		console.log('Item index:', itemIndex);
+		
+		const tx = await shopContract.updateProduct(_itemDetails, itemIndex);
+		console.log('⏳ Transaction sent. Hash:', tx.hash);
+		console.log('⏳ Waiting for confirmation...');
+		
+		const receipt = await tx.wait(); // Wait for transaction confirmation
+		console.log(' Transaction confirmed! Block:', receipt.blockNumber);
+		console.log(' Product updated successfully:', itemName);
+		
+		return { success: true, itemName, shopAddress, txHash: tx.hash };
+	} catch (error: any) {
+		console.error(' Error updating product:', error);
+		
+		// Provide better error messages
+		if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
+			throw new Error('Transaction rejected by user');
+		} else if (error.message?.includes('insufficient funds')) {
+			throw new Error('Insufficient funds to complete transaction');
+		} else if (error.message?.includes('Only owner')) {
+			throw new Error('Only the store owner can update products');
+		} else if (error.message?.includes('Product not found')) {
+			throw new Error('Product not found');
 		}
 		
 		throw error;
