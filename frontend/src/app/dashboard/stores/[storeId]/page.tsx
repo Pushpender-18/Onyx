@@ -11,7 +11,7 @@ export default function StoreDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const storeId = params.storeId as string;
-  const { stores, products, getProducts, isLoading, getAllStores, deleteStore } = useShop();
+  const { stores, products, getProducts, isLoading, getAllStores, deleteStore, signer } = useShop();
   const [store, setStore] = useState<Store | null>(null);
   const [storeProducts, setStoreProducts] = useState<Product[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
@@ -25,7 +25,7 @@ export default function StoreDetailsPage() {
       
       // If stores array is empty, fetch from blockchain
       if (stores.length === 0) {
-        await getAllStores();
+        await getAllStores(signer);
       }
       
       setIsLoadingData(false);
@@ -46,7 +46,7 @@ export default function StoreDetailsPage() {
   useEffect(() => {
     if (store && !hasLoadedProducts && getProducts) {
       console.log('Loading products for store:', store.id);
-      getProducts(store.id).then(storeProds => {
+      getProducts(store.id, signer).then(storeProds => {
         console.log('Products loaded:', storeProds);
         setStoreProducts(storeProds);
         setHasLoadedProducts(true);

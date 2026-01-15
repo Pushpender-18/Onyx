@@ -277,39 +277,40 @@ async function uploadToLocalNode(imageData: string | File): Promise<IPFSUploadRe
  */
 export function getIPFSUrl(ipfsHash: string): string {
   // Handle empty or invalid hash
-  if (!ipfsHash || typeof ipfsHash !== 'string') {
-    console.warn(' Invalid IPFS hash provided:', ipfsHash);
-    return 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
-  }
+  // if (!ipfsHash || typeof ipfsHash !== 'string') {
+  //   console.warn(' Invalid IPFS hash provided:', ipfsHash);
+  //   return 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+  // }
 
-  // Remove any ipfs:// protocol prefix if present
-  const cleanHash = ipfsHash.trim().replace(/^ipfs:\/\//, '');
+  // // Remove any ipfs:// protocol prefix if present
+  // const cleanHash = ipfsHash.trim().replace(/^ipfs:\/\//, '');
   
-  console.log(' Processing IPFS hash:', { original: ipfsHash, cleaned: cleanHash });
+  // console.log(' Processing IPFS hash:', { original: ipfsHash, cleaned: cleanHash });
 
-  // Validate that it looks like a valid hash
-  // Accepts: CIDv0 (Qm followed by chars) or CIDv1 (bafy or z prefix) or any alphanumeric that looks like a hash
-  const isValidHash = cleanHash.match(/^(Qm[a-zA-Z0-9]+|bafy[a-zA-Z0-9]+|z[a-zA-Z0-9]+|[a-zA-Z0-9]{46,})$/);
+  // // Validate that it looks like a valid hash
+  // // Accepts: CIDv0 (Qm followed by chars) or CIDv1 (bafy or z prefix) or any alphanumeric that looks like a hash
+  // const isValidHash = cleanHash.match(/^(Qm[a-zA-Z0-9]+|bafy[a-zA-Z0-9]+|z[a-zA-Z0-9]+|[a-zA-Z0-9]{46,})$/);
   
-  if (!isValidHash) {
-    console.warn(' Invalid IPFS hash format:', cleanHash, 'length:', cleanHash.length);
-    return 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
-  }
+  // if (!isValidHash) {
+  //   console.warn(' Invalid IPFS hash format:', cleanHash, 'length:', cleanHash.length);
+  //   return 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+  // }
 
-  console.log(' Valid IPFS hash detected:', cleanHash);
+  // console.log(' Valid IPFS hash detected:', cleanHash);
 
-  // Use Pinata gateway as primary (since we upload via Pinata)
-  // Fallback to ipfs.io if Pinata has issues
-  const gateways = [
-    `https://gateway.pinata.cloud/ipfs/${cleanHash}`,  // Primary - Pinata
-    `https://ipfs.io/ipfs/${cleanHash}`,                 // Fallback - Public gateway
-    `https://cloudflare-ipfs.com/ipfs/${cleanHash}`,    // Fallback - Cloudflare
-  ];
+  // // Use Pinata gateway as primary (since we upload via Pinata)
+  // // Fallback to ipfs.io if Pinata has issues
+  // const gateways = [
+  //   `https://gateway.pinata.cloud/ipfs/${cleanHash}`,  // Primary - Pinata
+  //   `https://ipfs.io/ipfs/${cleanHash}`,                 // Fallback - Public gateway
+  //   `https://cloudflare-ipfs.com/ipfs/${cleanHash}`,    // Fallback - Cloudflare
+  // ];
   
-  // Return primary gateway
-  console.log('📍 IPFS URL:', gateways[0]);
+  // // Return primary gateway
+  // console.log('📍 IPFS URL:', gateways[0]);
   
-  return gateways[0];
+  // return gateways[0];
+  return "";
 }
 
 /**

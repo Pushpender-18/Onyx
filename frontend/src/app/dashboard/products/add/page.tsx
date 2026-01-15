@@ -16,7 +16,7 @@ export default function AddProductPage() {
   const storeName = searchParams.get('storeName');
   const returnUrl = searchParams.get('returnUrl') || '/dashboard/products';
 
-  const { addProduct: addProductToBlockchain, stores, getAllStores } = useShop();
+  const { addProduct: addProductToBlockchain, stores, getAllStores, signer } = useShop();
   const [currentStore, setCurrentStore] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [loadingStore, setLoadingStore] = useState(true);
@@ -71,7 +71,7 @@ export default function AddProductPage() {
       if (!store && stores.length === 0) {
         console.log('📡 Stores not loaded, fetching all stores...');
         try {
-          await getAllStores();
+          await getAllStores(signer);
           // After loading, check again
           store = stores.find(s => s.id === storeId);
         } catch (error) {
@@ -280,7 +280,7 @@ export default function AddProductPage() {
           tags: [],
         },
         isPublished: true,
-      });
+      }, signer);
 
       if (newProduct) {
         toast.success('Product added successfully!', { id: loadingToast });

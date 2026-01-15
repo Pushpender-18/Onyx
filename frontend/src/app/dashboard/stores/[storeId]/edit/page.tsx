@@ -11,7 +11,7 @@ export default function EditStorePage() {
   const params = useParams();
   const router = useRouter();
   const storeId = params.storeId as string;
-  const { stores, isLoading, getAllStores, updateStore } = useShop();
+  const { stores, isLoading, getAllStores, updateStore, signer } = useShop();
   
   const [store, setStore] = useState<Store | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
@@ -33,7 +33,7 @@ export default function EditStorePage() {
       
       // If stores array is empty, fetch from blockchain
       if (stores.length === 0) {
-        await getAllStores();
+        await getAllStores(signer);
       }
       
       setIsLoadingData(false);

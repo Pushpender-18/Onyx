@@ -1,7 +1,6 @@
 'use client';
 
-import { useWeb3AuthUser } from '@web3auth/modal/react';
-import { useConnection } from 'wagmi';
+import { useWeb3Auth, useWeb3AuthUser } from '@web3auth/modal/react';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useShop } from '@/context/ShopContext';
@@ -9,14 +8,7 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { Plus, ShoppingCart, TrendUp, ArrowRight, ArrowsClockwise } from 'phosphor-react';
-
-// interface Store {
-//   id: string;
-//   name: string;
-//   products: number;
-//   sales: number;
-//   created: string;
-// }
+import { ethers } from 'ethers';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -43,39 +35,56 @@ export default function Dashboard() {
 
   // const [recentStores] = useState<Store[]>([]);
   const router = useRouter();
-  const { user, walletAddress } = useWeb3Auth();
-  const { stores, products, getProducts, isLoading, getAllStores, refreshData, getTotalSalesByOwner, totalSalesByOwner } = useShop();
+  const { provider } = useWeb3Auth();
+  console.log("Chain ID: " + provider?.chainId);
+
+  // const signer = getSigner(provider);
+  const { stores, products, getProducts, isLoading, getAllStores, refreshData, getTotalSalesByOwner, totalSalesByOwner, signer, setSignerWrapper } = useShop();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [tries, setTries] = useState(0);
 
   // Load stores from blockchain on mount
   useEffect(() => {
-    if (tries < 3) {
-      setTries(tries + 1);
-      if (stores.length === 0 && !isLoading) {
-        getAllStores();
-        setTries(tries + 1);
+    if (signer == null) {
+      const getSigner = async (provider: any) => {
+        if (provider) {
+          const signer = new ethers.BrowserProvider(provider);          
+          setSignerWrapper(await signer.getSigner());
+          // setSignerWrapper(signer);
+        }
+        return null;
       }
-      if (stores.length === 0 && !isLoading) {
-        getAllStores();
-        console.log("stores:", stores);
-      } else if (products.length === 0 && !isLoading) {
-        getProductsAndStores();
 
-        const result = async () => {
-          const sales = await getTotalSalesByOwner();
-          console.log("Total sales by owner:", sales);
-        };
-        result();
+      getSigner(provider);
+    }
+    else {
+      if (tries < 6) {
+        setTries(tries + 1);
+        if (stores.length === 0 && !isLoading) {
+          getAllStores(signer);
+          setTries(tries + 1);
+        }
+        if (stores.length === 0 && !isLoading) {
+          getAllStores(signer);
+          console.log("stores:", stores);
+        } else if (products.length === 0 && !isLoading) {
+          getProductsAndStores();
 
+          const result = async () => {
+            const sales = await getTotalSalesByOwner(signer);
+            console.log("Total sales by owner:", sales);
+          };
+          result();
+
+        }
       }
     }
-  }, [stores]);
+  }, [stores, signer]);
 
   const getProductsAndStores = async () => {
     console.log("Fetching products for stores:", stores);
     for (let store of stores) {
-      await getProducts(store.id);
+      await getProducts(store.id, signer);
     }
     console.log("products:", products);
   };
@@ -95,7 +104,7 @@ export default function Dashboard() {
   // Handle refresh from blockchain
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await refreshData();
+    await refreshData(signer);
     setIsRefreshing(false);
   };
 

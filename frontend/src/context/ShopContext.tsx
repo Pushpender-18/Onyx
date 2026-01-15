@@ -26,14 +26,15 @@ interface ShopContextType {
   isLoading: boolean;
   error: string | null;
   totalSalesByOwner: TotalSalesData | null;
-  
+  signer: any;
   // Store operations
+  setSignerWrapper: (signer: any) => void;
   createStore: (name: string, templateId: string, description: string, configuration: string, signer: any) => Promise<Store | null>;
   getAllStores: (signer: any) => Promise<Store[]>;
   getStoreByName: (name: string, signer: any) => Promise<Store | null>;
   updateStore: (storeId: string, updates: Partial<Store>) => void;
-  updateConfiguration: (shopName: string, shopAddress: string, configuration: string, newShopName: string) => Promise<boolean>;
-  updateShopName: (shopAddress: string, oldName: string, newName: string) => Promise<boolean>;
+  updateConfiguration: (shopName: string, shopAddress: string, configuration: string, newShopName: string, signer: any) => Promise<boolean>;
+  updateShopName: (shopAddress: string, oldName: string, newName: string, signer: any) => Promise<boolean>;
   deleteStore: (storeId: string) => void;
   restoreStore: (storeId: string, signer: any) => Promise<void>;
   getDeletedStoreIds: () => Set<string>;
@@ -42,11 +43,11 @@ interface ShopContextType {
   addProduct: (shopAddress: string, product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>, signer: any) => Promise<Product | null>;
   getProducts: (shopAddress: string, signer: any) => Promise<Product[]>;
   updateProduct: (productId: string, updates: Partial<Product>) => void;
-  updateProductOnBlockchain: (shopAddress: string, product: Product) => Promise<Product | null>;
+  updateProductOnBlockchain: (shopAddress: string, product: Product, signer: any) => Promise<Product | null>;
   deleteProduct: (productId: string) => void;
   
   // Sales operations
-  getTotalSalesByOwner: () => Promise<TotalSalesData | null>;
+  getTotalSalesByOwner: (signer: any) => Promise<TotalSalesData | null>;
   
   // Utility
   refreshData: (signer: any) => Promise<void>;
@@ -61,6 +62,11 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [totalSalesByOwner, setTotalSalesByOwner] = useState<TotalSalesData | null>(null);
+  const [signer, setSigner] = useState<any>(null);
+
+  const setSignerWrapper = (signer: any) => {
+    setSigner(signer);
+  }
 
   // localStorage utilities for tracking deleted stores
   const DELETED_STORES_KEY = 'onyx_deleted_stores';
@@ -285,21 +291,21 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   };
 
   // Update configuration on blockchain and local state
-  const updateConfiguration = async (shopName: string, shopAddress: string, configuration: string, newShopNaame: string): Promise<boolean> => {
+  const updateConfiguration = async (shopName: string, shopAddress: string, configuration: string, newShopName: string, signer: any): Promise<boolean> => {
     setIsLoading(true);
     setError(null);
 
     try {
       console.log('🔧 Updating configuration for shop:', shopName, shopAddress);
       
-      console.log(shopName, newShopNaame);
+      console.log(shopName, newShopName);
       // Call blockchain function with shopName
-      if (shopName !== newShopNaame) {
-        console.log(' Shop name has changed. Updating to new name:', newShopNaame);
-        await updateShopName(shopAddress, shopName, newShopNaame);
+      if (shopName !== newShopName) {
+        console.log(' Shop name has changed. Updating to new name:', newShopName);
+        await updateShopName(shopAddress, shopName, newShopName, signer);
       }
 
-      await shopInteraction.updateShopConfiguration(shopAddress, configuration, newShopNaame);
+      await shopInteraction.updateShopConfiguration(shopAddress, configuration, newShopName, signer);
       console.log(' Configuration updated on blockchain');
       
       // Update local state
@@ -493,21 +499,23 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   // Update product on blockchain and local state
   const updateProductOnBlockchain = async (
     shopAddress: string,
-    product: Product
+    product: Product,
+    signer: any
   ): Promise<Product | null> => {
     setIsLoading(true);
     setError(null);
 
     try {
       // Call blockchain function
-      const response = await shopInteraction.updateItemInShop(
+      await shopInteraction.updateItemInShop(
         shopAddress,
         product.id,
         product.name,
         product.price,
         product.stock,
         product.description,
-        product.images
+        product.images,
+        signer
       );
 
       // Update product in local state
@@ -551,7 +559,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   };
 
   // Get total sales from stores in state (blockchain read operation)
-  const getTotalSalesByOwner = async (): Promise<TotalSalesData | null> => {
+  const getTotalSalesByOwner = async (signer: any): Promise<TotalSalesData | null> => {
     setIsLoading(true);
     setError(null);
 
@@ -585,7 +593,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       for (const shopAddress of shopAddresses) {
         try {
           console.log(`📊 Fetching sales for shop: ${shopAddress}`);
-          const shopSales = await shopInteraction.getTotalSalesFromShop(shopAddress);
+          const shopSales = await shopInteraction.getTotalSalesFromShop(shopAddress, signer);
           
           // Add to overall totals
           overallTotalSalesInWei += BigInt(shopSales.totalSalesInWei);
@@ -648,7 +656,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   };
 
   // Update shop name on blockchain (write operation - requires correct network)
-  const updateShopName = async (shopAddress: string, oldName: string, newName: string): Promise<boolean> => {
+  const updateShopName = async (shopAddress: string, oldName: string, newName: string, signer: any): Promise<boolean> => {
     setIsLoading(true);
     setError(null);
 
@@ -657,7 +665,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       console.log('📍 Shop address:', shopAddress);
       
       // Call blockchain function to update shop name in Master contract
-      await shopInteraction.updateShopName(shopAddress, oldName, newName);
+      await shopInteraction.updateShopName(shopAddress, oldName, newName, signer);
       console.log('✅ Shop name updated on blockchain');
       
       // Update local state
@@ -705,8 +713,10 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     stores,
     products,
     isLoading,
+    signer,
     error,
     totalSalesByOwner,
+    setSignerWrapper,
     createStore,
     getAllStores,
     getStoreByName,

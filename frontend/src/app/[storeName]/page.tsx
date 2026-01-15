@@ -6,10 +6,13 @@ import { motion } from 'framer-motion';
 import { ShoppingCart, House, Heart } from 'phosphor-react';
 import toast from 'react-hot-toast';
 import { useShop } from '@/context/ShopContext';
-import { Store ,Product as StoreProduct, CartItem } from '@/types';
+import { Store, Product as StoreProduct, CartItem } from '@/types';
 import { TEMPLATES, TemplateConfig } from '@/app/dashboard/templateConfig';
 import { createTransaction, getShopOwner, sendTransaction } from '@/lib/shop_interaction';
 import { getIPFSUrl } from '@/lib/ipfs-upload';
+import { ethers } from 'ethers';
+import { useWeb3Auth, useWeb3AuthConnect } from '@web3auth/modal/react';
+import { Web3Auth } from '@web3auth/modal';
 
 interface Product {
   id: string;
@@ -40,7 +43,7 @@ interface StoreData {
 export default function PublishedStorePage() {
   const params = useParams();
   const storeName = params.storeName as string;
-  const { stores, products, getProducts, getStoreByName } = useShop();
+  const { stores, getProducts, getStoreByName, signer, setSignerWrapper } = useShop();
   const [storeData, setStoreData] = useState<StoreData | null>(null);
   const [store, setStore] = useState<Store | null>(null);
   const [storeProducts, setStoreProducts] = useState<StoreProduct[]>([]);
@@ -54,24 +57,40 @@ export default function PublishedStorePage() {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
-
+  const { provider } = useWeb3Auth();
+  const [tries, setTries] = useState(0);
   // Load cart items from cache on mount
   useEffect(() => {
-    if (storeName) {
-      const cacheKey = `cart_${storeName}`;
-      const cachedCart = localStorage.getItem(cacheKey);
-      if (cachedCart) {
-        try {
-          const parsedCart = JSON.parse(cachedCart);
-          setCartItems(parsedCart);
-          console.log('📦 Loaded cart from cache:', parsedCart);
-        } catch (error) {
-          console.error('❌ Error parsing cached cart:', error);
-          localStorage.removeItem(cacheKey);
+    console.log("Provider: ", provider);
+    if (tries < 5) {
+      setTries(tries + 1);
+      if (signer == null) {
+        const getSigner = async (provider: any) => {
+          if (provider) {
+            const signer = new ethers.BrowserProvider(provider);
+            console.log(signer);
+            setSignerWrapper(await signer.getSigner());
+          }
+          return null;
+        }
+        getSigner(provider);
+      }
+      else if (storeName) {
+        const cacheKey = `cart_${storeName}`;
+        const cachedCart = localStorage.getItem(cacheKey);
+        if (cachedCart) {
+          try {
+            const parsedCart = JSON.parse(cachedCart);
+            setCartItems(parsedCart);
+            console.log('📦 Loaded cart from cache:', parsedCart);
+          } catch (error) {
+            console.error('❌ Error parsing cached cart:', error);
+            localStorage.removeItem(cacheKey);
+          }
         }
       }
     }
-  }, [storeName]);
+  }, [storeName, signer, tries]);
 
   // Save cart items to cache whenever they change
   useEffect(() => {
@@ -85,17 +104,17 @@ export default function PublishedStorePage() {
   useEffect(() => {
     const loadStore = async () => {
       setLoading(true);
-      try {        
+      try {
         // First try to find in loaded stores
         let foundStore = stores.find(s => s.name.toLowerCase() === storeName.toLowerCase());
-        
+
         // If not found, fetch from blockchain
         if (!foundStore) {
           console.log('📡 Store not in cache, fetching from blockchain...');
           const filteredStoreName = storeName.replaceAll('%20', ' ');
           console.log(' Fetching store with name:', filteredStoreName);
-          const fetchedStore = await getStoreByName(filteredStoreName);
-          
+          const fetchedStore = await getStoreByName(filteredStoreName, signer);
+
           console.log('📡 Fetched store from blockchain:', storeName);
 
           if (fetchedStore) {
@@ -103,7 +122,7 @@ export default function PublishedStorePage() {
             foundStore = fetchedStore;
           }
         }
-        
+
         if (!foundStore) {
           setError('Store not found. It may not have been published yet.');
           setLoading(false);
@@ -120,13 +139,13 @@ export default function PublishedStorePage() {
         setTemplateConfig(template);
 
         // Load products for this store
-        const storeProds = await getProducts(foundStore.id);
+        const storeProds = await getProducts(foundStore.id, signer);
         console.log(' Store products:', storeProds);
         setStoreProducts(storeProds);
 
         // Convert to StoreData format for existing UI
         const categories = [...new Set(storeProds.map(p => p.metadata?.category || 'Uncategorized'))];
-        
+
         const convertedData: StoreData = {
           storeName: foundStore.name,
           heroTitle: foundStore.customization.heroTitle,
@@ -222,7 +241,7 @@ export default function PublishedStorePage() {
         }
         return [...prev, { id: productId, quantity: 1 }];
       });
-      toast.success(`${product.name} added to cart!`, {duration: 500});
+      toast.success(`${product.name} added to cart!`, { duration: 500 });
     }
   };
 
@@ -250,7 +269,7 @@ export default function PublishedStorePage() {
 
       for (const cartItem of cartItems) {
         const product = storeProducts.find((p) => p.id === cartItem.id);
-        
+
         if (!product) {
           throw new Error(`Product ${cartItem.id} not found`);
         }
@@ -266,10 +285,10 @@ export default function PublishedStorePage() {
         totalPriceInEth += _totalPriceInEth;
       }
 
-        const ownerAddress = await getShopOwner(store.name);
+      const ownerAddress = await getShopOwner(store.name, signer);
 
-        const txnResult = await sendTransaction(ownerAddress, totalPriceInEth);
-        console.log(' Transaction successful:', txnResult.txHash);
+      const txnResult = await sendTransaction(ownerAddress, totalPriceInEth, signer);
+      console.log(' Transaction successful:', txnResult.txHash);
 
       // Create transaction for all items at once
       console.log(' Creating transaction for all items...');
@@ -278,7 +297,8 @@ export default function PublishedStorePage() {
         itemIds,
         quantities,
         prices,
-        txnResult.txHash
+        txnResult.txHash,
+        signer
       );
 
       console.log(' Transaction successful:', result);
@@ -286,20 +306,20 @@ export default function PublishedStorePage() {
       // Clear cart after successful checkout
       setCartItems([]);
       setCartOpen(false);
-      
+
       // Clear cart from cache
       const cacheKey = `cart_${storeName}`;
       localStorage.removeItem(cacheKey);
       console.log('🗑️ Cleared cart cache after successful checkout');
-      
+
       toast.success('Order placed successfully! 🎉', { id: toastId });
       toast.success('You will receive confirmation shortly');
-      
+
     } catch (error: any) {
       console.error(' Checkout error:', error);
-      
+
       let errorMessage = 'Checkout failed. Please try again.';
-      
+
       if (error.message) {
         if (error.message.includes('rejected by user')) {
           errorMessage = 'Transaction was cancelled';
@@ -311,7 +331,7 @@ export default function PublishedStorePage() {
           errorMessage = error.message;
         }
       }
-      
+
       toast.error(errorMessage, { id: toastId });
     } finally {
       setCheckoutLoading(false);
@@ -434,7 +454,7 @@ export default function PublishedStorePage() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
-          style={{ 
+          style={{
             borderColor: storeData.secondaryColor,
             backgroundColor: storeData.primaryColor,
             color: storeData.textColor
@@ -446,11 +466,10 @@ export default function PublishedStorePage() {
             <button
               key={category}
               onClick={() => setSelectedCategory(category)}
-              className={`px-4 py-2 rounded-lg font-semibold whitespace-nowrap transition-all ${
-                selectedCategory === category
-                  ? 'text-white'
-                  : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
-              }`}
+              className={`px-4 py-2 rounded-lg font-semibold whitespace-nowrap transition-all ${selectedCategory === category
+                ? 'text-white'
+                : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                }`}
               style={{
                 backgroundColor:
                   selectedCategory === category ? storeData.accentColor : undefined,
@@ -539,9 +558,9 @@ export default function PublishedStorePage() {
     <div className="max-w-2xl mx-auto py-12">
       <h2 className="text-4xl font-bold mb-6" style={{ color: storeData.textColor }}>About {storeData.storeName}</h2>
       <p className="text-lg leading-relaxed" style={{ color: storeData.textColor }}>{storeData.aboutText}</p>
-      <div className="mt-8 p-6 rounded-lg border" style={{ 
+      <div className="mt-8 p-6 rounded-lg border" style={{
         backgroundColor: storeData.secondaryColor,
-        borderColor: storeData.accentColor 
+        borderColor: storeData.accentColor
       }}>
         <p style={{ color: storeData.textColor }}>
           <strong>Contact:</strong> {storeData.contactEmail}

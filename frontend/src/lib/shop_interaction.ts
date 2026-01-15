@@ -2,209 +2,208 @@ import {ethers } from "ethers";
 import Master from "@/abi/Master.json";
 import Shop from "@/abi/Shop.json";
 
-const MASTER_CONTRACT_ADDRESS = CURRENT_NETWORK.masterContractAddress;
+const MASTER_CONTRACT_ADDRESS = "0xA3924751847e704C95db5f2Ea44da5CbEb72ec37";
+
 
 // Check if connected to correct network
 // Returns true if on correct network, false otherwise
-async function checkAndSwitchNetwork(throwOnWrongNetwork: boolean = false): Promise<boolean> {
-	if (typeof window === 'undefined') {
-		console.warn('Window object not available. Running on server side.');
-		return false;
-	}
+// async function checkAndSwitchNetwork(throwOnWrongNetwork: boolean = false): Promise<boolean> {
+// 	if (typeof window === 'undefined') {
+// 		console.warn('Window object not available. Running on server side.');
+// 		return false;
+// 	}
 
-	const ethereum = (window as any).ethereum;
-	if (!ethereum) {
-		console.warn('MetaMask or Web3 wallet is not installed');
-		return false;
-	}
+// 	const ethereum = (window as any).ethereum;
+// 	if (!ethereum) {
+// 		console.warn('MetaMask or Web3 wallet is not installed');
+// 		return false;
+// 	}
 
-	try {
-		// Get current chain ID
-		const chainId = await ethereum.request({ method: 'eth_chainId' });
-		const currentChainId = parseInt(chainId, 16);
+// 	try {
+// 		// Get current chain ID
+// 		const chainId = await ethereum.request({ method: 'eth_chainId' });
+// 		const currentChainId = parseInt(chainId, 16);
 
-		console.log(` Current chainId: ${currentChainId}, Required: ${CURRENT_NETWORK.chainId}`);
+// 		console.log(` Current chainId: ${currentChainId}, Required: ${CURRENT_NETWORK.chainId}`);
 
-		// Check if on correct network
-		if (currentChainId !== CURRENT_NETWORK.chainId) {
-			console.log(` Wrong network. Current: ${currentChainId}, Required: ${CURRENT_NETWORK.chainId}`);
+// 		// Check if on correct network
+// 		if (currentChainId !== CURRENT_NETWORK.chainId) {
+// 			console.log(` Wrong network. Current: ${currentChainId}, Required: ${CURRENT_NETWORK.chainId}`);
 			
-			// For local network (Hardhat), show a warning
-			if (CURRENT_NETWORK.chainId === 31337) {
-				console.warn(` Expected local network (31337) but connected to ${currentChainId}.`);
-				console.warn(` Please manually switch to Localhost 8545 in MetaMask.`);
-				console.warn(` If the network doesn't exist, add it manually:`);
-				console.warn(`   - Network Name: Localhost 8545`);
-				console.warn(`   - RPC URL: http://127.0.0.1:8545`);
-				console.warn(`   - Chain ID: 31337`);
-				console.warn(`   - Currency Symbol: ETH`);
+// 			// For local network (Hardhat), show a warning
+// 			if (CURRENT_NETWORK.chainId === 31337) {
+// 				console.warn(` Expected local network (31337) but connected to ${currentChainId}.`);
+// 				console.warn(` Please manually switch to Localhost 8545 in MetaMask.`);
+// 				console.warn(` If the network doesn't exist, add it manually:`);
+// 				console.warn(`   - Network Name: Localhost 8545`);
+// 				console.warn(`   - RPC URL: http://127.0.0.1:8545`);
+// 				console.warn(`   - Chain ID: 31337`);
+// 				console.warn(`   - Currency Symbol: ETH`);
 				
-				if (throwOnWrongNetwork) {
-					throw new Error(`Please connect to ${CURRENT_NETWORK.chainName} network (Chain ID: ${CURRENT_NETWORK.chainId})`);
-				}
-				return false;
-			}
+// 				if (throwOnWrongNetwork) {
+// 					throw new Error(`Please connect to ${CURRENT_NETWORK.chainName} network (Chain ID: ${CURRENT_NETWORK.chainId})`);
+// 				}
+// 				return false;
+// 			}
 			
-			try {
-				// Try to switch to the correct network
-				await ethereum.request({
-					method: 'wallet_switchEthereumChain',
-					params: [{ chainId: `0x${CURRENT_NETWORK.chainId.toString(16)}` }],
-				});
-				console.log(` Switched to ${CURRENT_NETWORK.chainName}`);
-				return true;
-			} catch (switchError: any) {
-				console.error('Switch network error:', switchError);
-				// Network not added to MetaMask, try to add it
-				if (switchError.code === 4902) {
-					console.log(`📝 Network not found, attempting to add ${CURRENT_NETWORK.chainName}...`);
-					await addNetwork();
-					return true;
-				} else if (switchError.code === 4001) {
-					if (throwOnWrongNetwork) {
-						throw new Error('Network switch rejected by user');
-					}
-					return false;
-				} else {
-					if (throwOnWrongNetwork) {
-						throw switchError;
-					}
-					return false;
-				}
-			}
-		} else {
-			console.log(` Already on correct network: ${CURRENT_NETWORK.chainName}`);
-			return true;
-		}
-	} catch (error: any) {
-		console.error('Error checking/switching network:', error);
+// 			try {
+// 				// Try to switch to the correct network
+// 				await ethereum.request({
+// 					method: 'wallet_switchEthereumChain',
+// 					params: [{ chainId: `0x${CURRENT_NETWORK.chainId.toString(16)}` }],
+// 				});
+// 				console.log(` Switched to ${CURRENT_NETWORK.chainName}`);
+// 				return true;
+// 			} catch (switchError: any) {
+// 				console.error('Switch network error:', switchError);
+// 				// Network not added to MetaMask, try to add it
+// 				if (switchError.code === 4902) {
+// 					console.log(`📝 Network not found, attempting to add ${CURRENT_NETWORK.chainName}...`);
+// 					await addNetwork();
+// 					return true;
+// 				} else if (switchError.code === 4001) {
+// 					if (throwOnWrongNetwork) {
+// 						throw new Error('Network switch rejected by user');
+// 					}
+// 					return false;
+// 				} else {
+// 					if (throwOnWrongNetwork) {
+// 						throw switchError;
+// 					}
+// 					return false;
+// 				}
+// 			}
+// 		} else {
+// 			console.log(` Already on correct network: ${CURRENT_NETWORK.chainName}`);
+// 			return true;
+// 		}
+// 	} catch (error: any) {
+// 		console.error('Error checking/switching network:', error);
 		
-		// Provide more helpful error messages
-		if (throwOnWrongNetwork && error.message?.includes('Please connect to')) {
-			throw error; // Re-throw our custom error
-		}
+// 		// Provide more helpful error messages
+// 		if (throwOnWrongNetwork && error.message?.includes('Please connect to')) {
+// 			throw error; // Re-throw our custom error
+// 		}
 		
-		if (throwOnWrongNetwork) {
-			throw new Error(`Network error: ${error.message || 'Please connect to ' + CURRENT_NETWORK.chainName + ' network'}`);
-		}
-		return false;
-	}
-}
+// 		if (throwOnWrongNetwork) {
+// 			throw new Error(`Network error: ${error.message || 'Please connect to ' + CURRENT_NETWORK.chainName + ' network'}`);
+// 		}
+// 		return false;
+// 	}
+// }
 
-// Add network to MetaMask
-async function addNetwork(): Promise<void> {
-	const ethereum = (window as any).ethereum;
+// // Add network to MetaMask
+// async function addNetwork(): Promise<void> {
+// 	const ethereum = (window as any).ethereum;
 	
-	try {
-		// Determine native currency based on network
-		const nativeCurrency = CURRENT_NETWORK.chainId === 31337 
-			? { name: 'Ether', symbol: 'ETH', decimals: 18 }
-			: { name: 'MNT', symbol: 'MNT', decimals: 18 };
+// 	try {
+// 		// Determine native currency based on network
+// 		const nativeCurrency = CURRENT_NETWORK.chainId === 31337 
+// 			? { name: 'Ether', symbol: 'ETH', decimals: 18 }
+// 			: { name: 'MNT', symbol: 'MNT', decimals: 18 };
 
-		const networkParams = {
-			chainId: `0x${CURRENT_NETWORK.chainId.toString(16)}`,
-			chainName: CURRENT_NETWORK.chainName,
-			rpcUrls: [CURRENT_NETWORK.rpcUrl],
-			nativeCurrency,
-			blockExplorerUrls: CURRENT_NETWORK.blockExplorer ? [CURRENT_NETWORK.blockExplorer] : undefined,
-		};
+// 		const networkParams = {
+// 			chainId: `0x${CURRENT_NETWORK.chainId.toString(16)}`,
+// 			chainName: CURRENT_NETWORK.chainName,
+// 			rpcUrls: [CURRENT_NETWORK.rpcUrl],
+// 			nativeCurrency,
+// 			blockExplorerUrls: CURRENT_NETWORK.blockExplorer ? [CURRENT_NETWORK.blockExplorer] : undefined,
+// 		};
 
-		console.log('📝 Adding network with params:', networkParams);
+// 		console.log('📝 Adding network with params:', networkParams);
 
-		await ethereum.request({
-			method: 'wallet_addEthereumChain',
-			params: [networkParams],
-		});
-		console.log(` Added ${CURRENT_NETWORK.chainName} network to MetaMask`);
-	} catch (error: any) {
-		console.error('Error adding network:', error);
+// 		await ethereum.request({
+// 			method: 'wallet_addEthereumChain',
+// 			params: [networkParams],
+// 		});
+// 		console.log(` Added ${CURRENT_NETWORK.chainName} network to MetaMask`);
+// 	} catch (error: any) {
+// 		console.error('Error adding network:', error);
 		
-		if (error.code === 4001) {
-			throw new Error('Network addition rejected by user');
-		}
+// 		if (error.code === 4001) {
+// 			throw new Error('Network addition rejected by user');
+// 		}
 		
-		throw new Error(`Failed to add ${CURRENT_NETWORK.chainName} network to MetaMask: ${error.message}`);
-	}
-}
+// 		throw new Error(`Failed to add ${CURRENT_NETWORK.chainName} network to MetaMask: ${error.message}`);
+// 	}
+// }
 
-// Export function to get current network info
-export async function getCurrentNetwork() {
-	if (typeof window === 'undefined' || !(window as any).ethereum) {
-		return null;
-	}
+// // Export function to get current network info
+// export async function getCurrentNetwork() {
+// 	if (typeof window === 'undefined' || !(window as any).ethereum) {
+// 		return null;
+// 	}
 
-	try {
-		const ethereum = (window as any).ethereum;
-		const chainId = await ethereum.request({ method: 'eth_chainId' });
-		const currentChainId = parseInt(chainId, 16);
+// 	try {
+// 		const ethereum = (window as any).ethereum;
+// 		const chainId = await ethereum.request({ method: 'eth_chainId' });
+// 		const currentChainId = parseInt(chainId, 16);
 		
-		return {
-			chainId: currentChainId,
-			isCorrectNetwork: currentChainId === CURRENT_NETWORK.chainId,
-			expectedNetwork: CURRENT_NETWORK.chainName,
-			expectedChainId: CURRENT_NETWORK.chainId,
-		};
-	} catch (error) {
-		console.error('Error getting current network:', error);
-		return null;
-	}
-}
+// 		return {
+// 			chainId: currentChainId,
+// 			isCorrectNetwork: currentChainId === CURRENT_NETWORK.chainId,
+// 			expectedNetwork: CURRENT_NETWORK.chainName,
+// 			expectedChainId: CURRENT_NETWORK.chainId,
+// 		};
+// 	} catch (error) {
+// 		console.error('Error getting current network:', error);
+// 		return null;
+// 	}
+// }
 
-// Export utility function to check if wallet is available
-export async function isWalletConnected(): Promise<boolean> {
-	if (typeof window === 'undefined') {
-		return false;
-	}
+// // Export utility function to check if wallet is available
+// export async function isWalletConnected(): Promise<boolean> {
+// 	if (typeof window === 'undefined') {
+// 		return false;
+// 	}
 	
-	const ethereum = (window as any).ethereum;
-	if (!ethereum) {
-		return false;
-	}
+// 	const ethereum = (window as any).ethereum;
+// 	if (!ethereum) {
+// 		return false;
+// 	}
 	
-	try {
-		const accounts = await ethereum.request({ method: 'eth_accounts' });
-		return accounts && accounts.length > 0;
-	} catch (error) {
-		console.error('Error checking wallet connection:', error);
-		return false;
-	}
-}
+// 	try {
+// 		const accounts = await ethereum.request({ method: 'eth_accounts' });
+// 		return accounts && accounts.length > 0;
+// 	} catch (error) {
+// 		console.error('Error checking wallet connection:', error);
+// 		return false;
+// 	}
+// }
 
-// Export utility function to request wallet connection
-export async function connectWallet(): Promise<boolean> {
-	if (typeof window === 'undefined') {
-		return false;
-	}
+// // Export utility function to request wallet connection
+// export async function connectWallet(): Promise<boolean> {
+// 	if (typeof window === 'undefined') {
+// 		return false;
+// 	}
 	
-	const ethereum = (window as any).ethereum;
-	if (!ethereum) {
-		alert('Please install MetaMask or another Web3 wallet');
-		return false;
-	}
+// 	const ethereum = (window as any).ethereum;
+// 	if (!ethereum) {
+// 		alert('Please install MetaMask or another Web3 wallet');
+// 		return false;
+// 	}
 	
-	try {
-		const accounts = await ethereum.request({ 
-			method: 'eth_requestAccounts' 
-		});
-		return accounts && accounts.length > 0;
-	} catch (error: any) {
-		console.error('Error connecting wallet:', error);
-		if (error.code === 4001) {
-			console.log('User rejected the connection request');
-		}
-		return false;
-	}
-}
+// 	try {
+// 		const accounts = await ethereum.request({ 
+// 			method: 'eth_requestAccounts' 
+// 		});
+// 		return accounts && accounts.length > 0;
+// 	} catch (error: any) {
+// 		console.error('Error connecting wallet:', error);
+// 		if (error.code === 4001) {
+// 			console.log('User rejected the connection request');
+// 		}
+// 		return false;
+// 	}
+// }
 
 // Create and send a transaction to transfer ETH
-export async function sendTransaction(receiverAddress: string, amountInEth: number) {
+export async function sendTransaction(receiverAddress: string, amountInEth: number, signer: any) {
 	try {
 		console.log('💸 Creating transaction to:', receiverAddress);
 		console.log('💰 Amount:', amountInEth, 'ETH');
 		
-		// Get provider and signer
-		const provider = await checkWalletConnection(true); // Require correct network for transactions
-		const signer = await provider.getSigner();
+		// Get Sender's Address
 		const senderAddress = await signer.getAddress();
 		
 		console.log('📤 Sending from:', senderAddress);
@@ -262,7 +261,7 @@ export async function sendTransaction(receiverAddress: string, amountInEth: numb
 // Check if wallet is connected and available
 // Set requireCorrectNetwork to true for write operations (create, update, delete)
 // Set to false for read operations (get, fetch) to allow viewing data on any network
-async function checkWalletConnection(requireCorrectNetwork: boolean = false) {
+async function checkWalletConnection() {
 	if (typeof window === 'undefined') {
 		throw new Error('Window object not available. Running on server side.');
 	}
@@ -274,11 +273,11 @@ async function checkWalletConnection(requireCorrectNetwork: boolean = false) {
 	}
 
 	// Check and optionally switch to correct network
-	const isOnCorrectNetwork = await checkAndSwitchNetwork(requireCorrectNetwork);
+	// const isOnCorrectNetwork = await checkAndSwitchNetwork(requireCorrectNetwork);
 	
-	if (requireCorrectNetwork && !isOnCorrectNetwork) {
-		throw new Error(`Please connect to ${CURRENT_NETWORK.chainName} network (Chain ID: ${CURRENT_NETWORK.chainId}) to perform this action`);
-	}
+	// if (requireCorrectNetwork && !isOnCorrectNetwork) {
+	// 	throw new Error(`Please connect to ${CURRENT_NETWORK.chainName} network (Chain ID: ${CURRENT_NETWORK.chainId}) to perform this action`);
+	// }
 
 	// Check if MetaMask is unlocked
 	try {
@@ -328,11 +327,8 @@ async function checkWalletConnection(requireCorrectNetwork: boolean = false) {
 
 // Returns the Master contract instance
 // Set requireCorrectNetwork to true for write operations, false for read operations
-async function getMasterContract(requireCorrectNetwork: boolean = false) {
+async function getMasterContract(signer: any) {
 	try {
-		const provider = await checkWalletConnection(requireCorrectNetwork);
-		const signer = await provider.getSigner();
-
 		// Create contract instance
 		const masterContract = new ethers.Contract(
 			MASTER_CONTRACT_ADDRESS,
@@ -347,10 +343,8 @@ async function getMasterContract(requireCorrectNetwork: boolean = false) {
 	}
 }
 
-async function getSignerAddress(requireCorrectNetwork: boolean = false) {
+async function getSignerAddress(signer: any) {
 	try {
-		const provider = await checkWalletConnection(requireCorrectNetwork);
-		const signer = await provider.getSigner();
 		const address = await signer.getAddress();
 		return address;
 	} catch (error: any) {
@@ -360,11 +354,8 @@ async function getSignerAddress(requireCorrectNetwork: boolean = false) {
 }
 
 // Return particular Shop contract instance
-async function getShopContract(shopAddress: string, requireCorrectNetwork: boolean = false) {
+async function getShopContract(shopAddress: string, signer: any) {
 	try {
-		const provider = await checkWalletConnection(requireCorrectNetwork);
-		const signer = await provider.getSigner();
-
 		const shopContract = new ethers.Contract(
 			shopAddress,
 			Shop.abi,
@@ -381,8 +372,8 @@ async function getShopContract(shopAddress: string, requireCorrectNetwork: boole
 // Creates a new shop with the given name and template
 export async function createShop(shopName: string, templateName: string, description: string, configuration: string, signer: any) {
 	try {
-		const masterContract = await getMasterContract(true); // Require correct network for write operation
-		const owner = await getSignerAddress(true);
+		const masterContract = await getMasterContract(signer); // Require correct network for write operation
+		const owner = await getSignerAddress(signer);
 		const shopDetails = {
 			shopName: shopName,
 			shopType: templateName,
@@ -405,9 +396,10 @@ export async function createShop(shopName: string, templateName: string, descrip
 }
 
 // Retrieves all shops names (read operation - doesn't require correct network)
-export async function getAllShops() {
+export async function getAllShops(signer: any) {
 	try {
-		const masterContract = await getMasterContract(false); // Read operation - allow on any network
+		const masterContract = await getMasterContract(signer); // Read operation - allow on any network
+		console.log("Master Contract: ", masterContract);
 		const shops = await masterContract.getAllShops();
 		console.log('Fetched all shops:', shops);
 		return shops;
@@ -418,10 +410,10 @@ export async function getAllShops() {
 }
 
 // Retrieves shop details by name (read operation - doesn't require correct network)
-export async function getShopDetails(shopName: string) {
+export async function getShopDetails(shopName: string, signer: any) {
 	try {
-		const masterContract = await getMasterContract(false); // Read operation
-		const shopAddress = await masterContract.getShopByName(shopName);
+		const masterContract = await getMasterContract(signer); // Read operation
+		const shopAddress = await masterContract.getShopByName(shopName, signer);
 		console.log('Fetched shop address for', shopName, ':', shopAddress);
 		return shopAddress;
 	} catch (error) {
@@ -431,9 +423,9 @@ export async function getShopDetails(shopName: string) {
 }
 
 // Retrieves shop details from the Shop contract by address (read operation)
-export async function getShopDetailsFromContract(shopAddress: string) {
+export async function getShopDetailsFromContract(shopAddress: string, signer: any) {
 	try {
-		const shopContract = await getShopContract(shopAddress, false); // Read operation
+		const shopContract = await getShopContract(shopAddress, signer); // Read operation
 		const shopDetails = await shopContract.shopDetails();
 		console.log(' Raw shop details from contract:', shopDetails);
 		console.log(' isPublished field:', shopDetails.isPublished, 'or index[6]:', shopDetails[6]);
@@ -458,11 +450,11 @@ export async function getShopDetailsFromContract(shopAddress: string) {
 }
 
 // Retrieves the owner address of a shop (read operation - doesn't require correct network)
-export async function getShopOwner(shopName: string): Promise<string> {
+export async function getShopOwner(shopName: string, signer: any): Promise<string> {
 	try {
-		const shopAddress = await getShopDetails(shopName);
+		const shopAddress = await getShopDetails(shopName, signer);
 		console.log('👤 Fetching owner for shop:', shopAddress);
-		const shopContract = await getShopContract(shopAddress, false); // Read operation
+		const shopContract = await getShopContract(shopAddress, signer); // Read operation
 		const shopDetails = await shopContract.shopDetails();
 		const ownerAddress = shopDetails.owner || shopDetails[5];
 		console.log(' Shop owner address:', ownerAddress);
@@ -477,10 +469,10 @@ export async function getShopOwner(shopName: string): Promise<string> {
 // Add Items in the shop (write operation - requires correct network)
 export async function addItemToShop(shopAddress: string,
 	itemName: string, itemPrice: number, itemStock: number, description: string,
-	ipfsHash: string[]) {
+	ipfsHash: string[], signer: any) {
 	try {
 		console.log('🔄 Getting shop contract at:', shopAddress);
-		const shopContract = await getShopContract(shopAddress, true); // Write operation - require correct network
+		const shopContract = await getShopContract(shopAddress, signer); // Write operation - require correct network
 		
 		const timestamp = Math.floor(Date.now() / 1000).toString(); // Convert to string
 		
@@ -534,16 +526,19 @@ export async function updateItemInShop(
 	itemPrice: number,
 	itemStock: number,
 	description: string,
-	ipfsHash: string[]
+	ipfsHash: string[],
+	signer: any
 ) {
 	try {
 		console.log('🔄 Getting shop contract at:', shopAddress);
-		const shopContract = await getShopContract(shopAddress, true); // Write operation - require correct network
+		const shopContract = await getShopContract(shopAddress, signer); // Write operation - require correct network
 		
 		// Get all items to find the index of the item we're updating
 		console.log('🔍 Finding item index for ID:', itemId);
 		const allItems = await shopContract.getAllItems();
 		
+		console.log(' Total items in shop:', allItems);
+
 		let itemIndex = -1;
 		for (let i = 0; i < allItems.length; i++) {
 			if (allItems[i].id === itemId) {
@@ -575,7 +570,8 @@ export async function updateItemInShop(
 		console.log('📝 Sending update transaction to blockchain...');
 		console.log('Product details:', _itemDetails);
 		console.log('Item index:', itemIndex);
-		
+		console.log("Signer: ", signer);
+
 		const tx = await shopContract.updateProduct(_itemDetails, itemIndex);
 		console.log('⏳ Transaction sent. Hash:', tx.hash);
 		console.log('⏳ Waiting for confirmation...');
@@ -605,9 +601,9 @@ export async function updateItemInShop(
 
 // shopAddress to be given during actual usage
 // Fetch Items from the shop (read operation - doesn't require correct network)
-export async function getItemsFromShop(shopAddress: string) {
+export async function getItemsFromShop(shopAddress: string, signer: any) {
 	try {
-		const shopContract = await getShopContract(shopAddress, false); // Read operation
+		const shopContract = await getShopContract(shopAddress, signer); // Read operation
 		const items = await shopContract.getAllItems();
 		console.log('Fetched items from shop:', items);
 		return items;
@@ -623,7 +619,8 @@ export async function createTransaction(
 	itemIds: string[],
 	quantities: number[],
 	pricesInEth: number[],
-	txnHash: string
+	txnHash: string,
+	signer: any,
 ) {
 	try {
 		console.log('🛒 Creating transaction for multiple items');
@@ -640,8 +637,8 @@ export async function createTransaction(
 			throw new Error('No items provided');
 		}
 		
-		const shopContract = await getShopContract(shopAddress, true); // Write operation - require correct network
-		const provider = await checkWalletConnection(true);
+		const shopContract = await getShopContract(shopAddress, signer); // Write operation - require correct network
+		// const provider = await checkWalletConnection(signer);
 		
 		// Convert ETH prices to wei
 		const pricesInWei = pricesInEth.map(price => ethers.parseUnits(price.toString(), 18));
@@ -697,21 +694,11 @@ export async function createTransaction(
 }
 
 // Publish a shop (make it live) - write operation requires correct network
-export async function publishShop(shopAddress: string) {
+export async function publishShop(shopAddress: string, signer: any) {
 	try {
 		console.log(' Publishing shop at:', shopAddress);
 		
-		// Check if contract exists at this address
-		const provider = await checkWalletConnection(true);
-		const code = await provider.getCode(shopAddress);
-		
-		if (code === '0x') {
-			console.error(' No contract found at address:', shopAddress);
-			throw new Error('Store contract not found. The Hardhat node may have been restarted. Please recreate your store.');
-		}
-		
-		const shopContract = await getShopContract(shopAddress, true); // Write operation - require correct network
-		const signer = await provider.getSigner();
+		const shopContract = await getShopContract(shopAddress, signer); // Write operation - require correct network
 		const callerAddress = await signer.getAddress();
 		
 		// Get shop details to verify ownership and publication status
@@ -779,9 +766,9 @@ export async function publishShop(shopAddress: string) {
 }
 
 // Check if shop is published
-export async function isShopPublished(shopAddress: string): Promise<boolean> {
+export async function isShopPublished(shopAddress: string, signer: any): Promise<boolean> {
 	try {
-		const shopContract = await getShopContract(shopAddress);
+		const shopContract = await getShopContract(shopAddress, signer);
 		const isPublished = await shopContract.isShopPublished();
 		return isPublished;
 	} catch (error) {
@@ -791,21 +778,20 @@ export async function isShopPublished(shopAddress: string): Promise<boolean> {
 }
 
 // Update shop configuration (write operation - requires correct network)
-export async function updateShopConfiguration(shopAddress: string, newConfiguration: string, shopName: string) {
+export async function updateShopConfiguration(shopAddress: string, newConfiguration: string, shopName: string, signer: any) {
     try {
         console.log('🔄 Updating shop configuration at:', shopAddress);
         
         // Check if contract exists at this address
-        const provider = await checkWalletConnection(true);
-        const code = await provider.getCode(shopAddress);
+        // const provider = await checkWalletConnection(true);
+        // const code = await provider.getCode(shopAddress);
         
-        if (code === '0x') {
-            console.error(' No contract found at address:', shopAddress);
-            throw new Error('Store contract not found. The Hardhat node may have been restarted. Please recreate your store.');
-        }
+        // if (code === '0x') {
+        //     console.error(' No contract found at address:', shopAddress);
+        //     throw new Error('Store contract not found. The Hardhat node may have been restarted. Please recreate your store.');
+        // }
         
-        const shopContract = await getShopContract(shopAddress, true); // Write operation - require correct network
-        const signer = await provider.getSigner();
+        const shopContract = await getShopContract(shopAddress, signer); // Write operation - require correct network
         const callerAddress = await signer.getAddress();
         
         // Get shop details to verify ownership
@@ -864,10 +850,10 @@ export async function updateShopConfiguration(shopAddress: string, newConfigurat
 }
 
 // Fetch all orders from a shop and calculate total sales (read operation - doesn't require correct network)
-export async function getTotalSalesFromShop(shopAddress: string) {
+export async function getTotalSalesFromShop(shopAddress: string, signer: any) {
 	try {
 		console.log('💰 Fetching total sales from shop at:', shopAddress);
-		const shopContract = await getShopContract(shopAddress, false); // Read operation
+		const shopContract = await getShopContract(shopAddress, signer); // Read operation
 		
 		// Get order count first
 		const orderCount = await shopContract.orderCount();
@@ -913,7 +899,7 @@ export async function getTotalSalesFromShop(shopAddress: string) {
 }
 
 // Fetch all shops owned by an address and calculate total sales across all shops (read operation)
-export async function getTotalSalesForOwner(ownerAddress: string) {
+export async function getTotalSalesForOwner(ownerAddress: string, signer: any) {
 	try {
 		console.log('🏪 Fetching all shops for owner:', ownerAddress);
 		
@@ -923,7 +909,7 @@ export async function getTotalSalesForOwner(ownerAddress: string) {
 		}
 		
 		// Get master contract to fetch shops by owner
-		const masterContract = await getMasterContract(false); // Read operation
+		const masterContract = await getMasterContract(signer); // Read operation
 		
 		// Get all shop addresses owned by this address
 		const shopAddresses = await masterContract.getShopsByOwner(ownerAddress);
@@ -948,7 +934,7 @@ export async function getTotalSalesForOwner(ownerAddress: string) {
 		for (const shopAddress of shopAddresses) {
 			try {
 				console.log(`📊 Fetching sales for shop: ${shopAddress}`);
-				const shopSales = await getTotalSalesFromShop(shopAddress);
+				const shopSales = await getTotalSalesFromShop(shopAddress, signer);
 				
 				// Add to overall totals
 				overallTotalSalesInWei += BigInt(shopSales.totalSalesInWei);
@@ -998,7 +984,7 @@ export async function getTotalSalesForOwner(ownerAddress: string) {
 }
 
 // Update shop name on the Master contract (write operation - requires correct network)
-export async function updateShopName(shopAddress: string, oldName: string, newName: string) {
+export async function updateShopName(shopAddress: string, oldName: string, newName: string, signer: any) {
 	try {
 		console.log('✏️ Updating shop name in Master contract');
 		console.log('📍 Shop address:', shopAddress);
@@ -1006,16 +992,15 @@ export async function updateShopName(shopAddress: string, oldName: string, newNa
 		console.log('📝 New name:', newName);
 		
 		// Check if contract exists at this address
-		const provider = await checkWalletConnection(true);
-		const code = await provider.getCode(shopAddress);
+		// const provider = await checkWalletConnection(true);
+		// const code = await provider.getCode(shopAddress);
 		
-		if (code === '0x') {
-			console.error('❌ No contract found at address:', shopAddress);
-			throw new Error('Store contract not found. The Hardhat node may have been restarted. Please recreate your store.');
-		}
+		// if (code === '0x') {
+		// 	console.error('❌ No contract found at address:', shopAddress);
+		// 	throw new Error('Store contract not found. The Hardhat node may have been restarted. Please recreate your store.');
+		// }
 		
-		const masterContract = await getMasterContract(true); // Write operation - require correct network
-		const signer = await provider.getSigner();
+		const masterContract = await getMasterContract(signer); // Write operation - require correct network
 		const callerAddress = await signer.getAddress();
 		
 		console.log('🔑 Caller address:', callerAddress);

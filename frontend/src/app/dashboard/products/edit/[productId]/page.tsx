@@ -18,7 +18,7 @@ export default function EditProductPage() {
   const storeId = searchParams.get('storeId');
   const returnUrl = searchParams.get('returnUrl') || '/dashboard/products';
 
-  const { products, updateProductOnBlockchain } = useShop();
+  const { products, updateProductOnBlockchain, signer } = useShop();
   const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -254,7 +254,7 @@ export default function EditProductPage() {
           category: productData.category,
           tags: currentProduct.metadata?.tags || [],
         },
-      });
+      }, signer);
 
       if (updatedProduct) {
         toast.success('Product updated successfully!', { id: loadingToast });

@@ -41,7 +41,7 @@ export default function StoreEditor() {
 
   // Use Shop context for blockchain operations
   const { stores, products: blockchainProducts, addProduct: addProductToBlockchain,
-     getProducts, getStoreByName, updateConfiguration } = useShop();
+     getProducts, getStoreByName, updateConfiguration, signer } = useShop();
   const [currentStore, setCurrentStore] = useState<StoreType | null>(null);
   const [loadingStore, setLoadingStore] = useState(false);
   const [hasLoadedStore, setHasLoadedStore] = useState(false); // Flag to prevent re-loading
@@ -101,17 +101,17 @@ export default function StoreEditor() {
         } else {
           foundStore = stores.find(s => s.name.toLowerCase() === storeName.toLowerCase()) || null;
           if (!foundStore) {
-            foundStore = await getStoreByName(storeName);
+            foundStore = await getStoreByName(storeName, signer);
           }
         }
 
         if (foundStore) {
-          const data = await getStoreByName(foundStore.name);
+          const data = await getStoreByName(foundStore.name, signer);
           console.log(' Store found:', data);
           setCurrentStore(data);
 
           // Load products for this store
-          const storeProducts = await getProducts(foundStore.id);
+          const storeProducts = await getProducts(foundStore.id, signer);
           console.log(' Loaded products:', storeProducts);
 
           // No conversion needed - storeProducts is already Product[]
@@ -192,7 +192,7 @@ export default function StoreEditor() {
           images: updatedProduct.images,
           metadata: updatedProduct.metadata,
           isPublished: true,
-        });
+        }, signer);
 
         if (newProduct) {
           // Update local state with blockchain product
@@ -263,10 +263,10 @@ export default function StoreEditor() {
       toast.loading('Please confirm transaction in MetaMask...', { id: loadingToast });
 
       // Call blockchain function to publish the shop
-      const isPublished = await isShopPublished(currentStore.id);
+      const isPublished = await isShopPublished(currentStore.id, signer);
       
       if (!isPublished) {
-        const result = await publishShop(currentStore.id);
+        const result = await publishShop(currentStore.id, signer);
       }
 
       // Save UI customization data to localStorage for quick access
@@ -297,7 +297,7 @@ export default function StoreEditor() {
       console.log(storeName);
       // Update configuration on blockchain
       console.log('🔧 Updating shop configuration...');
-      const configUpdated = await updateConfiguration(storeName, currentStore.id, uiCustomizationString, finalStoreName);
+      const configUpdated = await updateConfiguration(storeName, currentStore.id, uiCustomizationString, finalStoreName, signer);
 
       if (!configUpdated) {
         throw new Error('Failed to update shop configuration');
@@ -315,7 +315,7 @@ export default function StoreEditor() {
 
       // Redirect to the published store after a short delay
       setTimeout(() => {
-        // window.location.href = `/${finalStoreName}`;
+        window.location.href = `/${finalStoreName}`;
       }, 2000);
     } catch (error: any) {
       console.error(' Error publishing store:', error);

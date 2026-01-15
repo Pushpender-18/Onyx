@@ -6,20 +6,9 @@ import { CHAIN_NAMESPACES, WEB3AUTH_NETWORK, type Web3AuthOptions } from '@web3a
 
 
 const web3AuthOptions: Web3AuthOptions = {
-  clientId: 'BFUtZIGwXk_eDWh6seAY8dUQzWZVvU4Dyn3oJqa3_Ns4LIJ4Xx-rLPPS6l0LBfznH5j_S0lYFlftSxoqQFPB6JM', 
+  // clientId: 'BFUtZIGwXk_eDWh6seAY8dUQzWZVvU4Dyn3oJqa3_Ns4LIJ4Xx-rLPPS6l0LBfznH5j_S0lYFlftSxoqQFPB6JM', 
+  clientId: "BMnN8_OTIHaPCgxZI5n9fE2YN40SkYuSrnN1BSoTjx9BkZ_aM74DoLRfFGzGBkXbqRzzIabH2FBx2ToMXHQ2ufs",
   web3AuthNetwork: WEB3AUTH_NETWORK.SAPPHIRE_DEVNET, 
-  chains: [
-    {
-      logo: "",
-      chainNamespace: CHAIN_NAMESPACES.EIP155,
-      chainId: '0x7a69', 
-      rpcTarget: 'http://127.0.0.1:8545', // Replace with your Infura project ID
-      displayName: 'Local Hardhat',
-      blockExplorerUrl: '',
-      ticker: 'ETH',
-      tickerName: 'Ethereum',
-    }
-  ],
 }
 
 const web3AuthContextConfig: Web3AuthContextConfig = {

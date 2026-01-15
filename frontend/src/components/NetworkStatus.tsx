@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { WarningCircle, CheckCircle, Info } from 'phosphor-react';
-import { getCurrentNetwork } from '@/lib/shop_interaction';
+// import { getCurrentNetwork } from '@/lib/shop_interaction';
 import { CURRENT_NETWORK } from '@/lib/network-config';
 
 export function NetworkStatus() {
@@ -27,8 +27,8 @@ export function NetworkStatus() {
 
   const checkNetwork = async () => {
     setIsChecking(true);
-    const info = await getCurrentNetwork();
-    setNetworkInfo(info);
+    // const info = await getCurrentNetwork();
+    // setNetworkInfo(info);
     setIsChecking(false);
   };
 
