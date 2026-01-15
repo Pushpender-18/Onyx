@@ -1,8 +1,7 @@
 <div align="center">
-  <img width="100" height="100" alt="Gemini_Generated_Image_l3fdjzl3fdjzl3fd" src="https://github.com/user-attachments/assets/cc28df10-4690-417c-913f-ff0a61178f19" />
+  <img width="150"  alt="image" src="https://github.com/user-attachments/assets/d6cb609e-5459-4fc4-892e-9cd34bd10f7d" />
 
   <p>Independent E-Commerce made easy. Powered by <b>Mantle</b></p>
-
 <br/>
 <p align="center">
   <img src="https://img.shields.io/github/last-commit/Pushpender-18/Onyx?label=Last%20Commit&logo=git" alt="Last Commit" />
