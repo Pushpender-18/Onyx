@@ -26,8 +26,8 @@
 Onyx is a decentralized, **no-code e-commerce builder** that allows anyone regardless of technical background—to launch a fully functional, self-owned storefront on the blockchain. By leveraging the Mantle Network, Onyx provides a high-speed, low-gas alternative to traditional Web2 platforms.
 
 ## Live Demos & Deliverables
-- **Demo Video:** [Watch on YouTube](YOUR_YOUTUBE_LINK)
-- **Live dApp:** [Launch Onyx](YOUR_VERCEL_OR_IPFS_LINK)
+- **Demo Video:** [Watch on YouTube]([YOUR_YOUTUBE_LINK](https://youtu.be/_rKr7k2CXyc))
+- **Live dApp:** [Launch Onyx]([YOUR_VERCEL_OR_IPFS_LINK](https://onyx-iota-five.vercel.app/))
 - **Pitch Deck:** [View Presentation](YOUR_SLIDES_LINK)
 
 ---
