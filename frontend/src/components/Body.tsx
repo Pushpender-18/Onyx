@@ -6,6 +6,7 @@ import { WagmiProvider } from "@web3auth/modal/react/wagmi";
 import Navigation from "./Navigation";
 import Footer from "./Footer";
 import { ShopProvider } from "@/context/ShopContext";
+import LayoutWrapper from "./LayoutWrapper";
 
 export default function Body(children: { children: React.ReactNode }) {
   const quertClient = new QueryClient();
@@ -14,11 +15,7 @@ export default function Body(children: { children: React.ReactNode }) {
       <QueryClientProvider client={quertClient}>
         <WagmiProvider>
           <ShopProvider>
-            <Navigation />
-            <main className="min-h-screen bg-var(--onyx-white)">
-              {children.children}
-            </main>
-            <Footer />
+            <LayoutWrapper children={children.children} />
           </ShopProvider>
         </WagmiProvider>
       </QueryClientProvider>

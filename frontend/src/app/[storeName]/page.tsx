@@ -58,11 +58,12 @@ export default function PublishedStorePage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const { provider } = useWeb3Auth();
+  const { isConnected } = useWeb3AuthConnect();
   const [tries, setTries] = useState(0);
   // Load cart items from cache on mount
   useEffect(() => {
     console.log("Provider: ", provider);
-    if (tries < 5) {
+    if ((tries < 5) && (isConnected)) {
       setTries(tries + 1);
       if (signer == null) {
         const getSigner = async (provider: any) => {
@@ -90,7 +91,7 @@ export default function PublishedStorePage() {
         }
       }
     }
-  }, [storeName, signer, tries]);
+  }, [storeName, signer, tries, isConnected]);
 
   // Save cart items to cache whenever they change
   useEffect(() => {
@@ -102,7 +103,18 @@ export default function PublishedStorePage() {
   }, [cartItems, storeName]);
 
   useEffect(() => {
+    if (!isConnected) {
+      console.log('Wallet not connected yet');
+      return;
+    }
+
+    if (!provider) {
+      console.log('Provider not available yet');
+      return;
+    }
+
     const loadStore = async () => {
+      console.log("Is connected: ", isConnected);
       setLoading(true);
       try {
         // First try to find in loaded stores
@@ -188,7 +200,7 @@ export default function PublishedStorePage() {
     };
 
     loadStore();
-  }, [storeName]);
+  }, [storeName, signer]);
 
   if (loading) {
     return (
