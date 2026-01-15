@@ -41,21 +41,29 @@ export default function Dashboard() {
   const { user, walletAddress } = useWeb3Auth();
   const { stores, products, getProducts, isLoading, getAllStores, refreshData, getTotalSalesByOwner, totalSalesByOwner } = useShop();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [tries, setTries] = useState(0);
 
   // Load stores from blockchain on mount
   useEffect(() => {
-    if (stores.length === 0 && !isLoading) {
-      getAllStores();
-      console.log("stores:", stores);
-    } else if (products.length === 0 && !isLoading) {
-      getProductsAndStores();
+    if (tries < 3) {
+      setTries(tries + 1);
+      if (stores.length === 0 && !isLoading) {
+        getAllStores();
+        setTries(tries + 1);
+      }
+      if (stores.length === 0 && !isLoading) {
+        getAllStores();
+        console.log("stores:", stores);
+      } else if (products.length === 0 && !isLoading) {
+        getProductsAndStores();
 
-      const result = async () => {
-        const sales = await getTotalSalesByOwner();
-        console.log("Total sales by owner:", sales);
-      };
-      result();
+        const result = async () => {
+          const sales = await getTotalSalesByOwner();
+          console.log("Total sales by owner:", sales);
+        };
+        result();
 
+      }
     }
   }, [stores]);
 
