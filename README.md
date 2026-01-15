@@ -106,7 +106,8 @@ In 2 minutes, Sarah has a live, decentralized storefront where customers can buy
 
 ### MODEL ARCHITECHTURE:
 
-<img width="700" alt="image" src="https://github.com/user-attachments/assets/d1578ce1-4f55-48ae-9b5f-1e40138036c0" />
+<img width="700" alt="image" src="https://github.com/user-attachments/assets/295de4f4-893c-44ab-aa79-84af55b0d4d8" />
+
 
 ---
 
