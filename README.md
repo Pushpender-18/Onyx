@@ -137,7 +137,7 @@ Before running the project locally, ensure you have the following installed:
 
 ### 1. Clone the Repository
 ```bash
-git clone [https://github.com/Pushpender-18/Onyx.git](https://github.com/Pushpender-18/Onyx.git)
+git clone [https://github.com/Pushpender-18/Onyx.git]
 
 cd Onyx
 ```
