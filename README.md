@@ -26,8 +26,12 @@
 Onyx is a decentralized, **no-code e-commerce builder** that allows anyone regardless of technical background—to launch a fully functional, self-owned storefront on the blockchain. By leveraging the Mantle Network, Onyx provides a high-speed, low-gas alternative to traditional Web2 platforms.
 
 ## Live Demos & Deliverables
-- **Demo Video:** [Watch on YouTube](YOUR_YOUTUBE_LINK](https://youtu.be/_rKr7k2CXyc))
-- **Live dApp:** [Launch Onyx](YOUR_VERCEL_OR_IPFS_LINK](https://onyx-iota-five.vercel.app/))
+- **Demo Video:** [Watch on YouTube](https://youtu.be/_rKr7k2CXyc)
+<a href="https://youtu.be/_rKr7k2CXyc" target="_blank">
+<img width="300"  alt="BUILDSHOWCASE ONYX" src="https://github.com/user-attachments/assets/8fa1d8cc-07b0-4d71-a617-f0e1244c56fb" />
+</a>
+
+- **Live dApp:** [Launch Onyx](https://onyx-iota-five.vercel.app/)
 - **Pitch Deck:** [View Presentation](YOUR_SLIDES_LINK)
 
 ---
@@ -92,6 +96,18 @@ In 2 minutes, Sarah has a live, decentralized storefront where customers can buy
 3.  **Customize:** User edits the theme, store name, and layout in the dashboard.
 4.  **Inventory:** User adds products (metadata + images) which are pinned to IPFS.
 5.  **Publish:** The store is live! A unique URL is generated for the merchant to share.
+
+---
+
+## Onyx Architecture:
+
+### USER FLOW:
+<img width="700" alt="image" src="https://github.com/user-attachments/assets/3162d214-879c-401a-9940-410e2acaca33" />
+
+
+### MODEL ARCHITECHTURE:
+
+<img width="700" alt="image" src="https://github.com/user-attachments/assets/d1578ce1-4f55-48ae-9b5f-1e40138036c0" />
 
 ---
 
