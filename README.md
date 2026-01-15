@@ -10,6 +10,7 @@
   <img src="https://img.shields.io/badge/status-Prototype-orange" alt="Status" />
   <img src="https://img.shields.io/badge/version-0.1.0-blue" alt="Version" />
   <img src="https://img.shields.io/badge/Mainnet-Coming_Soon-lightgrey" alt="Stability" />
+  <img src="https://vbr.nathanchung.dev/badge?page_id=amitrajeet7635.loopr&label=Views&logoColor=white&color=ff9900&style=plastic" alt="Active Nodes" />
   <br/>
   <img src="https://img.shields.io/badge/-Solidity-363636?logo=solidity&logoColor=white" alt="Solidity" />
   <img src="https://img.shields.io/badge/-NextJS-000000?logo=nextdotjs&logoColor=white" alt="NextJS" />
