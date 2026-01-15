@@ -1,9 +1,8 @@
+
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Web3AuthProvider } from "@/context/Web3AuthContext";
-import Navigation from "@/components/Navigation";
-import Footer from "@/components/Footer";
+import Body from "@/components/Body";
 
 const geist = Geist({
   variable: "--font-geist-sans",
@@ -28,16 +27,11 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+
   return (
     <html lang="en">
       <body className={`${geist.variable} ${geistMono.variable} antialiased`}>
-        <Web3AuthProvider>
-          <Navigation />
-           <main className="min-h-screen bg-var(--onyx-white)">
-            {children}
-          </main>
-          <Footer />
-        </Web3AuthProvider>
+        <Body children={children} />
       </body>
     </html>
   );

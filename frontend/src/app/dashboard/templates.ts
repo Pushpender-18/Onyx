@@ -389,7 +389,7 @@ export const TEMPLATE_ELEMENTS: Record<string, CanvasElement[]> = {
     {
       id: 'search',
       type: 'container',
-      content: '🔍 Search products, vendors...',
+      content: ' Search products, vendors...',
       x: 400,
       y: 15,
       width: 450,

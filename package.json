@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "run:node": "pnpm --filter backend run node",
+    "start:node": "pnpm --filter backend run node",
     "dev:frontend": "pnpm --filter frontend run dev",
+    "contract:compile": "pnpm --filter backend run compile",
     "contract:deploy": "pnpm --filter backend run deploy",
     "get:abi": "pnpm --filter backend run compile && cp ./backend/artifacts/contracts/*.sol/*.json ./frontend/src/abi/",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -12,5 +13,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "packageManager": "pnpm@10.25.0"
+  "packageManager": "pnpm@10.25.0",
+  "dependencies": {
+  }
 }

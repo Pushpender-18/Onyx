@@ -1,7 +1,9 @@
 'use client';
 
 import React from 'react';
-import { useWeb3Auth } from '@/context/Web3AuthContext';
+import { useWeb3Auth } from '@web3auth/modal/react';
+import { ShopProvider } from '@/context/ShopContext';
+// import { NetworkStatus } from '@/components/NetworkStatus';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
@@ -10,16 +12,16 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isAuthenticated, isLoading } = useWeb3Auth();
+  const { isConnected, isInitializing} = useWeb3Auth()
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (!isInitializing && !isConnected) {
       router.push('/');
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isConnected, isInitializing, router]);
 
-  if (isLoading) {
+  if (isInitializing) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-(--onyx-white)">
         <div className="flex flex-col items-center gap-4">
@@ -30,9 +32,13 @@ export default function DashboardLayout({
     );
   }
 
-  if (!isAuthenticated) {
+  if (!isConnected) {
     return null;
   }
 
-  return <>{children}</>;
+  return (
+    <ShopProvider>
+      {children}
+    </ShopProvider>
+  );
 }

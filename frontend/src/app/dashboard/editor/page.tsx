@@ -1,9 +1,12 @@
 'use client';
 
 import React, { useState, useCallback, useMemo, useRef, useEffect, useTransition } from 'react';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { useShop } from '@/context/ShopContext';
+import { Store as StoreType, Product, StoreCustomization as StoreData } from '@/types';
 import {
   ArrowLeft,
   Eye,
@@ -24,33 +27,8 @@ import {
 } from 'phosphor-react';
 import { TEMPLATES, DEFAULT_TEMPLATE, type TemplateConfig } from '../templateConfig';
 import { SavePublishModal } from '@/components/SavePublishModal';
-
-interface Product {
-  id: string;
-  name: string;
-  price: number;
-  image: string;
-  category: string;
-  description: string;
-  badge?: string;
-}
-
-interface StoreData {
-  storeName: string;
-  heroTitle: string;
-  heroSubtitle: string;
-  heroImage: string;
-  products: Product[];
-  categories: string[];
-  primaryColor: string;
-  secondaryColor: string;
-  accentColor: string;
-  textColor?: string;
-  aboutText: string;
-  contactEmail: string;
-}
-
-
+import { isShopPublished, publishShop } from '@/lib/shop_interaction';
+import { getIPFSUrl } from '@/lib/ipfs-upload';
 
 type PageType = 'home' | 'shop' | 'product' | 'about' | 'contact' | 'cart' | 'checkout';
 
@@ -58,11 +36,19 @@ export default function StoreEditor() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const storeName = searchParams.get('storeName') || 'My Store';
+  const storeId = searchParams.get('storeId'); // Get storeId from URL
   const templateId = (searchParams.get('template') || 'minimal') as keyof typeof TEMPLATES;
-  
+
+  // Use Shop context for blockchain operations
+  const { stores, products: blockchainProducts, addProduct: addProductToBlockchain,
+     getProducts, getStoreByName, updateConfiguration, signer } = useShop();
+  const [currentStore, setCurrentStore] = useState<StoreType | null>(null);
+  const [loadingStore, setLoadingStore] = useState(false);
+  const [hasLoadedStore, setHasLoadedStore] = useState(false); // Flag to prevent re-loading
+
   // Load the selected template or use default
   const selectedTemplate: TemplateConfig = TEMPLATES[templateId] || DEFAULT_TEMPLATE;
-  
+
   const [storeData, setStoreData] = useState<StoreData>({
     storeName: storeName,
     heroTitle: selectedTemplate.heroTitle,
@@ -97,9 +83,69 @@ export default function StoreEditor() {
   const [isHeroImageUpload, setIsHeroImageUpload] = useState(false);
   const [showSavePublishModal, setShowSavePublishModal] = useState(false);
 
+  // Load store and products from blockchain on mount
+  useEffect(() => {
+    const loadStoreData = async () => {
+      // Only load once
+      if (hasLoadedStore || (!storeId && !storeName)) return;
+
+      setLoadingStore(true);
+      try {
+        console.log('🔄 Loading store data for editor...');
+
+        // Find store by ID or name
+        let foundStore: StoreType | null = null;
+
+        if (storeId) {
+          foundStore = stores.find(s => s.id === storeId) || null;
+        } else {
+          foundStore = stores.find(s => s.name.toLowerCase() === storeName.toLowerCase()) || null;
+          if (!foundStore) {
+            foundStore = await getStoreByName(storeName, signer);
+          }
+        }
+
+        if (foundStore) {
+          const data = await getStoreByName(foundStore.name, signer);
+          console.log(' Store found:', data);
+          setCurrentStore(data);
+
+          // Load products for this store
+          const storeProducts = await getProducts(foundStore.id, signer);
+          console.log(' Loaded products:', storeProducts);
+
+          // No conversion needed - storeProducts is already Product[]
+
+          console.log(data?.customization);
+
+          setStoreData(prev => ({
+            ...prev,
+            storeName: data?.name || prev.storeName,
+            heroTitle: data?.customization.heroTitle || prev.heroTitle,
+            heroSubtitle: data?.customization.heroSubtitle || prev.heroSubtitle,
+            heroImage: data?.customization.heroImage || prev.heroImage,
+            aboutText: data?.customization.aboutText || prev.aboutText,
+            contactEmail: data?.customization.contactEmail || prev.contactEmail,
+            primaryColor: data?.customization.primaryColor || prev.primaryColor,
+            products: storeProducts, // Use directly instead of converting
+          }));
+
+          setHasLoadedStore(true); // Mark as loaded
+        }
+      } catch (error) {
+        console.error(' Error loading store data:', error);
+        toast.error('Failed to load store data');
+      } finally {
+        setLoadingStore(false);
+      }
+    };
+
+    loadStoreData();
+  }, [storeId, storeName]); // Removed 'stores' from dependencies
+
   const filteredProducts = storeData.products.filter((product) => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
+    const matchesCategory = selectedCategory === 'All' || product.metadata?.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
@@ -123,15 +169,62 @@ export default function StoreEditor() {
     setCartItems((prev) => prev.filter((item) => item.id !== productId));
   };
 
-  const updateProduct = (updatedProduct: Product) => {
-    setStoreData((prev) => ({
-      ...prev,
-      products: prev.products.map((p) =>
-        p.id === updatedProduct.id ? updatedProduct : p
-      ),
-    }));
-    setEditingProduct(null);
-    setShowProductModal(false);
+  const updateProduct = async (updatedProduct: Product) => {
+    if (!currentStore) {
+      toast.error('Store not loaded. Please refresh the page.');
+      return;
+    }
+
+    try {
+      // Check if this is a new product (not yet in blockchain)
+      const existingProduct = storeData.products.find(p => p.id === updatedProduct.id);
+      const isNewProduct = !existingProduct || existingProduct.id.startsWith('temp-');
+
+      if (isNewProduct) {
+        // Add new product to blockchain
+        console.log('➕ Adding new product to blockchain:', updatedProduct);
+        const newProduct = await addProductToBlockchain(currentStore.id, {
+          name: updatedProduct.name,
+          storeId: currentStore.id,
+          price: updatedProduct.price,
+          stock: updatedProduct.stock,
+          description: updatedProduct.description,
+          images: updatedProduct.images,
+          metadata: updatedProduct.metadata,
+          isPublished: true,
+        }, signer);
+
+        if (newProduct) {
+          // Update local state with blockchain product
+          setStoreData((prev) => ({
+            ...prev,
+            products: prev.products.map((p) =>
+              p.id === updatedProduct.id ? newProduct : p
+            ),
+          }));
+          toast.success('Product added successfully!');
+        } else {
+          toast.error('Failed to add product to blockchain');
+          return;
+        }
+      } else {
+        // Update existing product (currently just local state)
+        // TODO: Add blockchain update function when available
+        setStoreData((prev) => ({
+          ...prev,
+          products: prev.products.map((p) =>
+            p.id === updatedProduct.id ? updatedProduct : p
+          ),
+        }));
+        toast.success('Product updated!');
+      }
+
+      setEditingProduct(null);
+      setShowProductModal(false);
+    } catch (error) {
+      console.error(' Error updating product:', error);
+      toast.error('Failed to save product');
+    }
   };
 
   const deleteProduct = (productId: string) => {
@@ -142,61 +235,106 @@ export default function StoreEditor() {
   };
 
   const addNewProduct = () => {
-    const newProduct: Product = {
-      id: Date.now().toString(),
-      name: 'New Product',
-      price: 0,
-      image: 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop',
-      category: storeData.categories[1] || 'General',
-      description: 'Product description',
-    };
-    setEditingProduct(newProduct);
-    setShowProductModal(true);
+    if (!currentStore) {
+      toast.error('Store not loaded. Please refresh the page.');
+      return;
+    }
+
+    // Navigate to the Add Product page with store info
+    const currentUrl = window.location.pathname + window.location.search;
+    router.push(`/dashboard/products/add?storeId=${currentStore.id}&storeName=${encodeURIComponent(currentStore.name)}&returnUrl=${encodeURIComponent(currentUrl)}`);
   };
 
   // Publish handler
   const handlePublish = async (finalStoreName: string) => {
-    // Simulate publishing delay
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    // Save store data to localStorage
-    const storeDataToSave = {
-      ...storeData,
-      storeName: finalStoreName,
-      publishedAt: new Date().toISOString(),
-    };
-
-    localStorage.setItem(
-      `onyx-store-${finalStoreName}`,
-      JSON.stringify(storeDataToSave)
-    );
-
-    // Save to a list of published stores
-    const publishedStores = JSON.parse(
-      localStorage.getItem('onyx-published-stores') || '[]'
-    );
-    if (
-      !publishedStores.find(
-        (store: any) => store.storeName === finalStoreName
-      )
-    ) {
-      publishedStores.push({
-        storeName: finalStoreName,
-        url: `https://${finalStoreName}.onyx-shop.vercel.app`,
-        publishedAt: new Date().toISOString(),
-      });
-      localStorage.setItem(
-        'onyx-published-stores',
-        JSON.stringify(publishedStores)
-      );
+    if (!currentStore) {
+      toast.error('Store not found. Please refresh the page.');
+      return;
     }
 
-    toast.success(`Store "${finalStoreName}" published successfully!`);
+    const loadingToast = toast.loading('Preparing to publish store...');
 
-    // Redirect to the published store after a short delay
-    setTimeout(() => {
-      window.location.href = `/${finalStoreName}`;
-    }, 2500);
+    try {
+      console.log(' Publishing store to blockchain...');
+      console.log('Store address:', currentStore.id);
+      console.log('Store name:', finalStoreName);
+
+      // Update toast to show MetaMask is needed
+      toast.loading('Please confirm transaction in MetaMask...', { id: loadingToast });
+
+      // Call blockchain function to publish the shop
+      const isPublished = await isShopPublished(currentStore.id, signer);
+      
+      if (!isPublished) {
+        const result = await publishShop(currentStore.id, signer);
+      }
+
+      // Save UI customization data to localStorage for quick access
+      const uiCustomization = {
+        storeName: finalStoreName,
+        heroTitle: storeData.heroTitle,
+        heroSubtitle: storeData.heroSubtitle,
+        heroImage: storeData.heroImage,
+        aboutText: storeData.aboutText,
+        contactEmail: storeData.contactEmail,
+        primaryColor: storeData.primaryColor,
+        secondaryColor: storeData.secondaryColor,
+        accentColor: storeData.accentColor,
+        textColor: storeData.textColor,
+        products: storeData.products,
+        categories: storeData.categories,
+      };
+      
+      // Convert all product stock values to integers
+      uiCustomization.products = uiCustomization.products.map(product => ({
+        ...product,
+        stock: parseInt(product.stock.toString())
+      }));
+
+      console.log(uiCustomization.products);
+      const uiCustomizationString =  JSON.stringify(uiCustomization);
+
+      console.log(storeName);
+      // Update configuration on blockchain
+      console.log('🔧 Updating shop configuration...');
+      const configUpdated = await updateConfiguration(storeName, currentStore.id, uiCustomizationString, finalStoreName, signer);
+
+      if (!configUpdated) {
+        throw new Error('Failed to update shop configuration');
+      }
+
+      console.log(' Configuration updated successfully');
+
+      // Save to localStorage for quick access
+      localStorage.setItem(
+        `onyx-ui-${currentStore.id}`,
+        uiCustomizationString
+      );
+
+      toast.success(`Store "${finalStoreName}" is now live!`, { id: loadingToast });
+
+      // Redirect to the published store after a short delay
+      setTimeout(() => {
+        window.location.href = `/${finalStoreName}`;
+      }, 2000);
+    } catch (error: any) {
+      console.error(' Error publishing store:', error);
+
+      let errorMessage = 'Failed to publish store';
+      if (error.message?.includes('rejected')) {
+        errorMessage = 'Transaction rejected';
+      } else if (error.message?.includes('insufficient funds')) {
+        errorMessage = 'Insufficient funds for gas';
+      } else if (error.message?.includes('Only owner')) {
+        errorMessage = 'Only store owner can publish';
+      } else if (error.message?.includes('already published')) {
+        errorMessage = 'Store is already published';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      toast.error(errorMessage, { id: loadingToast });
+    }
   };
 
   // Professional Navbar Component
@@ -218,7 +356,7 @@ export default function StoreEditor() {
               const IconComponent = item.icon as any;
               return (
                 <button
-                  key={item.page}
+                  key={item.id}
                   onClick={() => setCurrentPage(item.page)}
                   className="text-sm font-semibold transition-colors hover:opacity-70 flex items-center gap-2"
                   style={{ color: currentPage === item.page ? storeData.accentColor : '#cbd5e1' }}
@@ -259,37 +397,28 @@ export default function StoreEditor() {
         }}
       />
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
-        <motion.h2
+        <h2
           className="text-5xl md:text-6xl font-bold mb-4 leading-tight"
           style={{ color: storeData.textColor }}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
         >
           {storeData.heroTitle}
-        </motion.h2>
-        <motion.p
+        </h2>
+        <p
           className="text-lg md:text-xl mb-8 max-w-2xl font-light"
           style={{ color: '#cbd5e1' }}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
         >
           {storeData.heroSubtitle}
-        </motion.p>
-        <motion.button
+        </p>
+        <button
           className="px-8 py-3 rounded-lg font-semibold transition-all hover:shadow-2xl"
-          style={{ 
+          style={{
             backgroundColor: storeData.accentColor,
             color: storeData.primaryColor
           }}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
           onClick={() => setCurrentPage('shop')}
         >
           SHOP NOW
-        </motion.button>
+        </button>
       </div>
     </div>
   );
@@ -298,7 +427,7 @@ export default function StoreEditor() {
   const CategoryFilter = () => (
     <div
       className="py-8 border-b"
-      style={{ 
+      style={{
         background: `linear-gradient(180deg, ${storeData.secondaryColor} 0%, ${storeData.primaryColor} 100%)`
       }}
     >
@@ -313,11 +442,10 @@ export default function StoreEditor() {
               <button
                 key={category}
                 onClick={() => setSelectedCategory(category)}
-                className={`px-5 py-3 rounded-lg font-semibold text-sm transition-all flex items-center gap-2 ${
-                  selectedCategory === category
-                    ? 'shadow-lg'
-                    : ''
-                }`}
+                className={`px-5 py-3 rounded-lg font-semibold text-sm transition-all flex items-center gap-2 ${selectedCategory === category
+                  ? 'shadow-lg'
+                  : ''
+                  }`}
                 style={{
                   backgroundColor:
                     selectedCategory === category ? storeData.accentColor : '#2d3748',
@@ -339,7 +467,7 @@ export default function StoreEditor() {
   const SearchFilterBar = () => (
     <div
       className="py-6 border-b"
-      style={{ 
+      style={{
         backgroundColor: storeData.primaryColor,
         borderColor: storeData.secondaryColor
       }}
@@ -359,7 +487,7 @@ export default function StoreEditor() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-12 pr-4 py-3 rounded-lg focus:outline-none transition-all"
-              style={{ 
+              style={{
                 backgroundColor: '#2d3748',
                 color: '#e8eaed',
                 borderColor: '#4a5568',
@@ -396,7 +524,7 @@ export default function StoreEditor() {
                   <label className="block text-xs font-bold mb-2 uppercase" style={{ color: '#a0aec0' }}>
                     Sort By
                   </label>
-                  <select className="w-full px-3 py-2 rounded text-sm" style={{ 
+                  <select className="w-full px-3 py-2 rounded text-sm" style={{
                     backgroundColor: '#1a1f3a',
                     color: '#e8eaed',
                     border: '1px solid #4a5568'
@@ -432,92 +560,108 @@ export default function StoreEditor() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredProducts.map((product) => (
-              <motion.div
-                key={product.id}
-                className="group rounded-xl overflow-hidden transition-all duration-300 cursor-pointer"
-                style={{
-                  backgroundColor: storeData.secondaryColor,
-                  border: '1px solid #4a5568'
-                }}
-                whileHover={{ y: -6, boxShadow: `0 20px 25px -5px ${storeData.accentColor}33` }}
-                onClick={() => {
-                  setSelectedProduct(product);
-                  setCurrentPage('product');
-                }}
-              >
-                <div className="relative overflow-hidden h-64">
-                  <img
-                    src={product.image}
-                    alt={product.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <div
-                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                    style={{
-                      background: `linear-gradient(135deg, ${storeData.accentColor}dd 0%, #0a0e27 100%)`,
-                    }}
-                  >
-                    <button
-                      className="px-6 py-2 bg-white rounded-lg font-semibold text-sm transition-all hover:shadow-lg"
-                      style={{ color: storeData.accentColor }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedProduct(product);
-                        setCurrentPage('product');
-                      }}
-                    >
-                      Quick View
-                    </button>
-                  </div>
-                </div>
+            {filteredProducts.map((product) => {
+              const productImage = product.images.length > 0 ? getIPFSUrl(product.images[0]) : 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+              const productCategory = product.metadata?.category || 'General';
+              const productBadge = product.isPublished ? undefined : 'Draft';
 
-                <div className="p-5">
-                  <div className="mb-3 flex items-center gap-2">
-                    <span
-                      className="inline-block text-xs font-bold px-3 py-1 rounded-full"
-                      style={{ 
-                        backgroundColor: storeData.accentColor,
-                        color: storeData.primaryColor
+              return (
+                <motion.div
+                  key={product.id}
+                  className="group rounded-xl overflow-hidden transition-all duration-300 cursor-pointer"
+                  style={{
+                    backgroundColor: storeData.secondaryColor,
+                    border: '1px solid #4a5568'
+                  }}
+                  whileHover={{ y: -6, boxShadow: `0 20px 25px -5px ${storeData.accentColor}33` }}
+                  onClick={() => {
+                    setSelectedProduct(product);
+                    setCurrentPage('product');
+                  }}
+                >
+                  <div className="relative overflow-hidden h-64">
+                    <img
+                      src={productImage}
+                      alt={product.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      onError={(e) => {
+                        const img = e.target as HTMLImageElement;
+                        if (!img.src.includes('ipfs.io')) {
+                          img.src = productImage.replace('gateway.pinata.cloud', 'ipfs.io');
+                        } else if (!img.src.includes('cloudflare-ipfs.com')) {
+                          img.src = productImage.replace('gateway.pinata.cloud', 'cloudflare-ipfs.com');
+                        } else {
+                          img.src = 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+                        }
+                      }}
+                    />
+                    <div
+                      className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                      style={{
+                        background: `linear-gradient(135deg, ${storeData.accentColor}dd 0%, #0a0e27 100%)`,
                       }}
                     >
-                      {product.category}
-                    </span>
-                    {product.badge && (
-                      <span className="text-xs font-bold px-3 py-1 rounded-full" style={{ 
-                        backgroundColor: '#4a5568',
-                        color: '#fbbf24'
-                      }}>
-                        {product.badge}
+                      <button
+                        className="px-6 py-2 bg-white rounded-lg font-semibold text-sm transition-all hover:shadow-lg"
+                        style={{ color: storeData.accentColor }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedProduct(product);
+                          setCurrentPage('product');
+                        }}
+                      >
+                        Quick View
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="p-5">
+                    <div className="mb-3 flex items-center gap-2">
+                      <span
+                        className="inline-block text-xs font-bold px-3 py-1 rounded-full"
+                        style={{
+                          backgroundColor: storeData.accentColor,
+                          color: storeData.primaryColor
+                        }}
+                      >
+                        {productCategory}
                       </span>
-                    )}
+                      {productBadge && (
+                        <span className="text-xs font-bold px-3 py-1 rounded-full" style={{
+                          backgroundColor: '#4a5568',
+                          color: '#fbbf24'
+                        }}>
+                          {productBadge}
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="text-lg font-bold mb-1" style={{ color: storeData.textColor }}>{product.name}</h3>
+                    <p style={{ color: '#a0aec0' }} className="text-sm mb-4 line-clamp-2">{product.description}</p>
+                    <div className="flex items-center justify-between">
+                      <span
+                        className="text-2xl font-bold"
+                        style={{ color: storeData.accentColor }}
+                      >
+                        ${product.price.toFixed(2)}
+                      </span>
+                      <button
+                        className="px-4 py-2 rounded-lg font-semibold text-sm transition-all hover:shadow-lg"
+                        style={{
+                          backgroundColor: storeData.accentColor,
+                          color: storeData.primaryColor
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addToCart(product.id);
+                        }}
+                      >
+                        Add
+                      </button>
+                    </div>
                   </div>
-                  <h3 className="text-lg font-bold mb-1" style={{ color: storeData.textColor }}>{product.name}</h3>
-                  <p style={{ color: '#a0aec0' }} className="text-sm mb-4 line-clamp-2">{product.description}</p>
-                  <div className="flex items-center justify-between">
-                    <span
-                      className="text-2xl font-bold"
-                      style={{ color: storeData.accentColor }}
-                    >
-                      ${product.price.toFixed(2)}
-                    </span>
-                    <button
-                      className="px-4 py-2 rounded-lg font-semibold text-sm transition-all hover:shadow-lg"
-                      style={{ 
-                        backgroundColor: storeData.accentColor,
-                        color: storeData.primaryColor
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        addToCart(product.id);
-                      }}
-                    >
-                      Add
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -527,6 +671,9 @@ export default function StoreEditor() {
   // Product Detail Page
   const ProductDetailPage = () => {
     if (!selectedProduct) return null;
+
+    const productImage = selectedProduct.images && selectedProduct.images.length > 0 ? getIPFSUrl(selectedProduct.images[0]) : 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+    const productCategory = selectedProduct.metadata?.category || 'General';
 
     return (
       <div className="py-16">
@@ -548,9 +695,19 @@ export default function StoreEditor() {
               animate={{ opacity: 1, x: 0 }}
             >
               <img
-                src={selectedProduct.image}
+                src={productImage}
                 alt={selectedProduct.name}
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  const img = e.target as HTMLImageElement;
+                  if (!img.src.includes('ipfs.io')) {
+                    img.src = productImage.replace('gateway.pinata.cloud', 'ipfs.io');
+                  } else if (!img.src.includes('cloudflare-ipfs.com')) {
+                    img.src = productImage.replace('gateway.pinata.cloud', 'cloudflare-ipfs.com');
+                  } else {
+                    img.src = 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+                  }
+                }}
               />
             </motion.div>
 
@@ -565,7 +722,7 @@ export default function StoreEditor() {
                   className="inline-block text-sm font-bold px-4 py-1 rounded-full text-white mb-4"
                   style={{ backgroundColor: storeData.accentColor }}
                 >
-                  {selectedProduct.category}
+                  {productCategory}
                 </span>
                 <h1 className="text-5xl font-bold mb-2" style={{ color: storeData.accentColor }}>{selectedProduct.name}</h1>
                 <p className="text-lg" style={{ color: '#a0aec0' }}>{selectedProduct.description}</p>
@@ -615,7 +772,7 @@ export default function StoreEditor() {
                 <ul className="space-y-3" style={{ color: '#a0aec0' }}>
                   <li className="flex justify-between">
                     <span>Category:</span>
-                    <strong style={{ color: '#cbd5e1' }}>{selectedProduct.category}</strong>
+                    <strong style={{ color: '#cbd5e1' }}>{productCategory}</strong>
                   </li>
                   <li className="flex justify-between">
                     <span>SKU:</span>
@@ -647,7 +804,7 @@ export default function StoreEditor() {
           Back
         </button>
 
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+        <div>
           <h1 className="text-5xl font-bold mb-8" style={{ color: storeData.accentColor }}>About Us</h1>
           <div className="prose prose-lg max-w-none">
             <p className="text-xl leading-relaxed mb-6" style={{ color: '#a0aec0' }}>
@@ -663,7 +820,7 @@ export default function StoreEditor() {
               bringing joy and functionality to your home for years to come.
             </p>
           </div>
-        </motion.div>
+        </div>
       </div>
     </div>
   );
@@ -681,7 +838,7 @@ export default function StoreEditor() {
           Back
         </button>
 
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+        <div>
           <h1 className="text-5xl font-bold mb-4" style={{ color: storeData.accentColor }}>Contact Us</h1>
           <p className="text-xl mb-12" style={{ color: '#a0aec0' }}>
             We would love to hear from you. Get in touch with us today!
@@ -694,7 +851,7 @@ export default function StoreEditor() {
                 type="text"
                 className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
                 placeholder="Your name"
-                style={{ 
+                style={{
                   '--tw-ring-color': storeData.accentColor,
                   borderColor: '#2d3748',
                   backgroundColor: '#1a1f3a',
@@ -708,7 +865,7 @@ export default function StoreEditor() {
                 type="email"
                 className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
                 placeholder="your@email.com"
-                style={{ 
+                style={{
                   '--tw-ring-color': storeData.accentColor,
                   borderColor: '#2d3748',
                   backgroundColor: '#1a1f3a',
@@ -722,7 +879,7 @@ export default function StoreEditor() {
                 className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
                 placeholder="Your message"
                 rows={6}
-                style={{ 
+                style={{
                   '--tw-ring-color': storeData.accentColor,
                   borderColor: '#2d3748',
                   backgroundColor: '#1a1f3a',
@@ -750,7 +907,7 @@ export default function StoreEditor() {
               </p>
             </div>
           </div>
-        </motion.div>
+        </div>
       </div>
     </div>
   );
@@ -797,37 +954,51 @@ export default function StoreEditor() {
               {/* Cart Items */}
               <div className="md:col-span-2">
                 <div className="space-y-4">
-                  {cartProducts.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex gap-6 p-6 border rounded-lg"
-                      style={{ borderColor: '#2d3748', backgroundColor: '#1a1f3a' }}
-                    >
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        className="w-24 h-24 object-cover rounded"
-                      />
-                      <div className="flex-1">
-                        <h3 className="text-lg font-bold" style={{ color: '#cbd5e1' }}>{item.name}</h3>
-                        <p style={{ color: '#a0aec0' }}>${item.price.toFixed(2)}</p>
-                        <div className="flex items-center gap-4 mt-4">
-                          <span className="text-sm" style={{ color: '#a0aec0' }}>Qty: {item.quantity}</span>
-                          <button
-                            onClick={() => removeFromCart(item.id)}
-                            className="text-red-500 hover:text-red-700 text-sm font-semibold"
-                          >
-                            Remove
-                          </button>
+                  {cartProducts.map((item) => {
+                    const itemImage = item.images && item.images.length > 0 ? getIPFSUrl(item.images[0]) : 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="flex gap-6 p-6 border rounded-lg"
+                        style={{ borderColor: '#2d3748', backgroundColor: '#1a1f3a' }}
+                      >
+                        <img
+                          src={itemImage}
+                          alt={item.name}
+                          className="w-24 h-24 object-cover rounded"
+                          onError={(e) => {
+                            const img = e.target as HTMLImageElement;
+                            if (!img.src.includes('ipfs.io')) {
+                              img.src = itemImage.replace('gateway.pinata.cloud', 'ipfs.io');
+                            } else if (!img.src.includes('cloudflare-ipfs.com')) {
+                              img.src = itemImage.replace('gateway.pinata.cloud', 'cloudflare-ipfs.com');
+                            } else {
+                              img.src = 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+                            }
+                          }}
+                        />
+                        <div className="flex-1">
+                          <h3 className="text-lg font-bold" style={{ color: '#cbd5e1' }}>{item.name}</h3>
+                          <p style={{ color: '#a0aec0' }}>${item.price.toFixed(2)}</p>
+                          <div className="flex items-center gap-4 mt-4">
+                            <span className="text-sm" style={{ color: '#a0aec0' }}>Qty: {item.quantity}</span>
+                            <button
+                              onClick={() => removeFromCart(item.id)}
+                              className="text-red-500 hover:text-red-700 text-sm font-semibold"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xl font-bold" style={{ color: storeData.accentColor }}>
+                            ${(item.price * item.quantity).toFixed(2)}
+                          </p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-xl font-bold" style={{ color: storeData.accentColor }}>
-                          ${(item.price * item.quantity).toFixed(2)}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -904,7 +1075,7 @@ export default function StoreEditor() {
                     type="text"
                     placeholder="First Name"
                     className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
-                    style={{ 
+                    style={{
                       '--tw-ring-color': storeData.accentColor,
                       borderColor: '#2d3748',
                       backgroundColor: '#0a0e27',
@@ -915,7 +1086,7 @@ export default function StoreEditor() {
                     type="text"
                     placeholder="Last Name"
                     className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
-                    style={{ 
+                    style={{
                       '--tw-ring-color': storeData.accentColor,
                       borderColor: '#2d3748',
                       backgroundColor: '#0a0e27',
@@ -927,7 +1098,7 @@ export default function StoreEditor() {
                   type="email"
                   placeholder="Email"
                   className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
-                  style={{ 
+                  style={{
                     '--tw-ring-color': storeData.accentColor,
                     borderColor: '#2d3748',
                     backgroundColor: '#0a0e27',
@@ -938,7 +1109,7 @@ export default function StoreEditor() {
                   type="text"
                   placeholder="Address"
                   className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
-                  style={{ 
+                  style={{
                     '--tw-ring-color': storeData.accentColor,
                     borderColor: '#2d3748',
                     backgroundColor: '#0a0e27',
@@ -950,7 +1121,7 @@ export default function StoreEditor() {
                     type="text"
                     placeholder="City"
                     className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
-                    style={{ 
+                    style={{
                       '--tw-ring-color': storeData.accentColor,
                       borderColor: '#2d3748',
                       backgroundColor: '#0a0e27',
@@ -961,7 +1132,7 @@ export default function StoreEditor() {
                     type="text"
                     placeholder="State"
                     className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
-                    style={{ 
+                    style={{
                       '--tw-ring-color': storeData.accentColor,
                       borderColor: '#2d3748',
                       backgroundColor: '#0a0e27',
@@ -972,7 +1143,7 @@ export default function StoreEditor() {
                     type="text"
                     placeholder="ZIP Code"
                     className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
-                    style={{ 
+                    style={{
                       '--tw-ring-color': storeData.accentColor,
                       borderColor: '#2d3748',
                       backgroundColor: '#0a0e27',
@@ -986,7 +1157,7 @@ export default function StoreEditor() {
                   type="text"
                   placeholder="Cardholder Name"
                   className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
-                  style={{ 
+                  style={{
                     '--tw-ring-color': storeData.accentColor,
                     borderColor: '#2d3748',
                     backgroundColor: '#0a0e27',
@@ -997,7 +1168,7 @@ export default function StoreEditor() {
                   type="text"
                   placeholder="Card Number"
                   className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
-                  style={{ 
+                  style={{
                     '--tw-ring-color': storeData.accentColor,
                     borderColor: '#2d3748',
                     backgroundColor: '#0a0e27',
@@ -1009,7 +1180,7 @@ export default function StoreEditor() {
                     type="text"
                     placeholder="MM/YY"
                     className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
-                    style={{ 
+                    style={{
                       '--tw-ring-color': storeData.accentColor,
                       borderColor: '#2d3748',
                       backgroundColor: '#0a0e27',
@@ -1020,7 +1191,7 @@ export default function StoreEditor() {
                     type="text"
                     placeholder="CVV"
                     className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
-                    style={{ 
+                    style={{
                       '--tw-ring-color': storeData.accentColor,
                       borderColor: '#2d3748',
                       backgroundColor: '#0a0e27',
@@ -1078,401 +1249,12 @@ export default function StoreEditor() {
     );
   };
 
-  // Memoized Image Preview Component - prevents re-renders on slider changes
-  // Ultra-optimized Image Preview with direct DOM manipulation
-  const ImagePreview = React.memo(({ src, scale, offsetX, offsetY }: { src: string; scale: number; offsetX: number; offsetY: number }) => {
-    const imgRef = useRef<HTMLImageElement>(null);
-    
-    useEffect(() => {
-      if (imgRef.current) {
-        // Use direct DOM manipulation for instant visual feedback
-        imgRef.current.style.transform = `scale(${scale}) translate(${offsetX}px, ${offsetY}px)`;
-      }
-    }, [scale, offsetX, offsetY]);
-
-    return (
-      <div className="w-full bg-gray-100 rounded-lg overflow-hidden border border-gray-300">
-        <div className="relative w-full aspect-square flex items-center justify-center">
-          <img
-            ref={imgRef}
-            src={src}
-            alt="Preview"
-            className="w-full h-full object-cover"
-            style={{
-              transformOrigin: 'center',
-              willChange: 'transform',
-              transition: 'none', // No transition for immediate feedback
-            }}
-          />
-        </div>
-      </div>
-    );
-  });
-  ImagePreview.displayName = 'ImagePreview';
-
-  // Ultra-optimized Crop Controls with local state and debouncing
-  const CropControls = React.memo(({
-    scale,
-    offsetX,
-    offsetY,
-    onScaleChange,
-    onOffsetXChange,
-    onOffsetYChange,
-  }: {
-    scale: number;
-    offsetX: number;
-    offsetY: number;
-    onScaleChange: (value: number) => void;
-    onOffsetXChange: (value: number) => void;
-    onOffsetYChange: (value: number) => void;
-  }) => {
-    const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-    const [localScale, setLocalScale] = useState(scale);
-    const [localOffsetX, setLocalOffsetX] = useState(offsetX);
-    const [localOffsetY, setLocalOffsetY] = useState(offsetY);
-
-    // Sync external state to local state
-    useEffect(() => {
-      setLocalScale(scale);
-    }, [scale]);
-
-    useEffect(() => {
-      setLocalOffsetX(offsetX);
-    }, [offsetX]);
-
-    useEffect(() => {
-      setLocalOffsetY(offsetY);
-    }, [offsetY]);
-
-    // Debounced handler for scale
-    const handleScaleChange = useCallback((newValue: number) => {
-      setLocalScale(newValue);
-      
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-      
-      debounceTimerRef.current = setTimeout(() => {
-        onScaleChange(newValue);
-      }, 50); // 50ms debounce for smooth interaction
-    }, [onScaleChange]);
-
-    // Debounced handler for offset X
-    const handleOffsetXChange = useCallback((newValue: number) => {
-      setLocalOffsetX(newValue);
-      
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-      
-      debounceTimerRef.current = setTimeout(() => {
-        onOffsetXChange(newValue);
-      }, 50);
-    }, [onOffsetXChange]);
-
-    // Debounced handler for offset Y
-    const handleOffsetYChange = useCallback((newValue: number) => {
-      setLocalOffsetY(newValue);
-      
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-      
-      debounceTimerRef.current = setTimeout(() => {
-        onOffsetYChange(newValue);
-      }, 50);
-    }, [onOffsetYChange]);
-
-    // Cleanup debounce timer on unmount
-    useEffect(() => {
-      return () => {
-        if (debounceTimerRef.current) {
-          clearTimeout(debounceTimerRef.current);
-        }
-      };
-    }, []);
-
-    return (
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-semibold mb-2">
-            Zoom Level: {(localScale * 100).toFixed(0)}%
-          </label>
-          <input
-            type="range"
-            min="1"
-            max="3"
-            step="0.05"
-            value={localScale}
-            onChange={(e) => handleScaleChange(parseFloat(e.target.value))}
-            className="w-full cursor-pointer accent-blue-600"
-            style={{ cursor: 'pointer' }}
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-semibold mb-2">
-            Horizontal Position: {localOffsetX}px
-          </label>
-          <input
-            type="range"
-            min="-100"
-            max="100"
-            step="1"
-            value={localOffsetX}
-            onChange={(e) => handleOffsetXChange(parseInt(e.target.value))}
-            className="w-full cursor-pointer accent-blue-600"
-            style={{ cursor: 'pointer' }}
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-semibold mb-2">
-            Vertical Position: {localOffsetY}px
-          </label>
-          <input
-            type="range"
-            min="-100"
-            max="100"
-            step="1"
-            value={localOffsetY}
-            onChange={(e) => handleOffsetYChange(parseInt(e.target.value))}
-            className="w-full cursor-pointer accent-blue-600"
-            style={{ cursor: 'pointer' }}
-          />
-        </div>
-      </div>
-    );
-  });
-  CropControls.displayName = 'CropControls';
-
-  // Image Upload and Crop Modal
-  const ImageUploadModal = () => {
-    if (!showImageUploadModal) return null;
-
-    // Use callbacks to prevent re-rendering the entire modal on slider changes
-    const handleCropScaleChange = useCallback((value: number) => {
-      setCropScale(value);
-    }, []);
-
-    const handleCropOffsetXChange = useCallback((value: number) => {
-      setCropOffsetX(value);
-    }, []);
-
-    const handleCropOffsetYChange = useCallback((value: number) => {
-      setCropOffsetY(value);
-    }, []);
-
-    return (
-      <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
-        <motion.div
-          className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-        >
-          <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
-            <h2 className="text-2xl font-bold">Upload Product Image</h2>
-            <button
-              onClick={() => {
-                setShowImageUploadModal(false);
-                setUploadedImage(null);
-                setCropScale(1);
-                setCropOffsetX(0);
-                setCropOffsetY(0);
-              }}
-              className="p-2 hover:bg-gray-100 rounded-lg"
-            >
-              <X size={24} />
-            </button>
-          </div>
-
-          <div className="p-6 space-y-6">
-            {/* Mode Toggle */}
-            <div className="flex gap-4 border-b pb-4">
-              <button
-                onClick={() => {
-                  setImageUploadMode('upload');
-                  setUploadedImage(null);
-                }}
-                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                  imageUploadMode === 'upload'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                <Upload size={18} className="inline mr-2" />
-                Upload from Computer
-              </button>
-              <button
-                onClick={() => setImageUploadMode('url')}
-                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                  imageUploadMode === 'url'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Use Image URL
-              </button>
-            </div>
-
-            {/* Upload from Computer */}
-            {imageUploadMode === 'upload' ? (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold mb-3">
-                    Select Image (Recommended: 1:1 aspect ratio for products)
-                  </label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onload = (event) => {
-                            setUploadedImage(event.target?.result as string);
-                          };
-                          reader.readAsDataURL(file);
-                        }
-                      }}
-                      className="hidden"
-                      id="imageUpload"
-                    />
-                    <label htmlFor="imageUpload" className="cursor-pointer">
-                      <Upload size={32} className="mx-auto text-gray-400 mb-2" />
-                      <p className="text-gray-700 font-semibold mb-1">Click to upload</p>
-                      <p className="text-sm text-gray-500">or drag and drop</p>
-                      <p className="text-xs text-gray-400 mt-2">PNG, JPG up to 10MB</p>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Image Preview and Crop */}
-                {uploadedImage && (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-semibold mb-2">Preview</label>
-                      <ImagePreview src={uploadedImage} scale={cropScale} offsetX={cropOffsetX} offsetY={cropOffsetY} />
-                    </div>
-
-                    {/* Crop Controls */}
-                    <CropControls
-                      scale={cropScale}
-                      offsetX={cropOffsetX}
-                      offsetY={cropOffsetY}
-                      onScaleChange={handleCropScaleChange}
-                      onOffsetXChange={handleCropOffsetXChange}
-                      onOffsetYChange={handleCropOffsetYChange}
-                    />
-
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                      <p className="text-sm text-blue-800">
-                        <strong>Aspect Ratio:</strong> 1:1 (Square) is recommended for product images. The image will display at 500x500px in the store.
-                      </p>
-                    </div>
-
-                    <div className="flex gap-3">
-                      <button
-                        onClick={() => {
-                          if (editingProduct) {
-                            setEditingProduct({
-                              ...editingProduct,
-                              image: uploadedImage,
-                            });
-                          }
-                          setShowImageUploadModal(false);
-                          setUploadedImage(null);
-                          setCropScale(1);
-                          setCropOffsetX(0);
-                          setCropOffsetY(0);
-                        }}
-                        className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-                      >
-                        Use This Image
-                      </button>
-                      <button
-                        onClick={() => {
-                          setUploadedImage(null);
-                          setCropScale(1);
-                          setCropOffsetX(0);
-                          setCropOffsetY(0);
-                        }}
-                        className="flex-1 px-4 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
-                      >
-                        Reset
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              /* URL Input Mode */
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold mb-2">Image URL</label>
-                  <input
-                    type="url"
-                    placeholder="https://example.com/image.jpg"
-                    defaultValue={editingProduct?.image || ''}
-                    onChange={(e) => {
-                      if (editingProduct) {
-                        setEditingProduct({
-                          ...editingProduct,
-                          image: e.target.value,
-                        });
-                      }
-                    }}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                {editingProduct?.image && (
-                  <div>
-                    <label className="block text-sm font-semibold mb-2">Preview</label>
-                    <div className="w-full bg-gray-100 rounded-lg overflow-hidden border border-gray-300">
-                      <div className="relative w-full aspect-square">
-                        <img
-                          src={editingProduct.image}
-                          alt="Preview"
-                          className="w-full h-full object-cover"
-                          onError={() => {
-                            alert('Unable to load image from URL');
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-sm text-blue-800">
-                    <strong>Aspect Ratio:</strong> 1:1 (Square) is recommended for product images. The image will display at 500x500px in the store.
-                  </p>
-                </div>
-
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => {
-                      setShowImageUploadModal(false);
-                      setImageUploadMode('upload');
-                    }}
-                    className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-                  >
-                    Done
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </motion.div>
-      </div>
-    );
-  };
-
   // Product Edit Modal
   const ProductEditModal = () => {
     if (!editingProduct || !showProductModal) return null;
+
+    const productImage = editingProduct.images?.[0] || '';
+    const productCategory = editingProduct.metadata?.category || '';
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backdropFilter: 'blur(4px)', backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
@@ -1535,9 +1317,12 @@ export default function StoreEditor() {
               <div>
                 <label className="block text-sm font-semibold mb-2">Category</label>
                 <select
-                  value={editingProduct.category}
+                  value={productCategory}
                   onChange={(e) =>
-                    setEditingProduct({ ...editingProduct, category: e.target.value })
+                    setEditingProduct({
+                      ...editingProduct,
+                      metadata: { ...editingProduct.metadata, category: e.target.value }
+                    })
                   }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                 >
@@ -1554,11 +1339,11 @@ export default function StoreEditor() {
               <label className="block text-sm font-semibold mb-3">Product Image</label>
               <div className="space-y-3">
                 {/* Current Image Preview */}
-                {editingProduct.image && (
+                {productImage && (
                   <div className="w-full bg-gray-100 rounded-lg overflow-hidden border border-gray-300">
                     <div className="relative w-full aspect-square">
                       <img
-                        src={editingProduct.image}
+                        src={productImage}
                         alt="Product"
                         className="w-full h-full object-cover"
                       />
@@ -1571,9 +1356,12 @@ export default function StoreEditor() {
                   <label className="block text-xs font-semibold text-gray-600 mb-1">Image URL</label>
                   <input
                     type="text"
-                    value={editingProduct.image}
+                    value={productImage}
                     onChange={(e) =>
-                      setEditingProduct({ ...editingProduct, image: e.target.value })
+                      setEditingProduct({
+                        ...editingProduct,
+                        images: [e.target.value]
+                      })
                     }
                     placeholder="https://example.com/image.jpg"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm"
@@ -1600,7 +1388,7 @@ export default function StoreEditor() {
                 onClick={() => updateProduct(editingProduct)}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700"
               >
-                Save Changes
+                {editingProduct.id.startsWith('temp-') ? 'Add Product' : 'Save Changes'}
               </button>
               <button
                 onClick={() => {
@@ -1612,6 +1400,217 @@ export default function StoreEditor() {
                 Cancel
               </button>
             </div>
+          </div>
+        </motion.div>
+      </div>
+    );
+  };
+
+  // Image Upload and Crop Modal
+  const ImageUploadModal = () => {
+    if (!showImageUploadModal) return null;
+
+    // Use callbacks to prevent re-rendering the entire modal on slider changes
+    const handleCropScaleChange = useCallback((value: number) => {
+      setCropScale(value);
+    }, []);
+
+    const handleCropOffsetXChange = useCallback((value: number) => {
+      setCropOffsetX(value);
+    }, []);
+
+    const handleCropOffsetYChange = useCallback((value: number) => {
+      setCropOffsetY(value);
+    }, []);
+
+    return (
+      <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
+        <motion.div
+          className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+        >
+          <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
+            <h2 className="text-2xl font-bold">Upload Product Image</h2>
+            <button
+              onClick={() => {
+                setShowImageUploadModal(false);
+                setUploadedImage(null);
+                setCropScale(1);
+                setCropOffsetX(0);
+                setCropOffsetY(0);
+              }}
+              className="p-2 hover:bg-gray-100 rounded-lg"
+            >
+              <X size={24} />
+            </button>
+          </div>
+
+          <div className="p-6 space-y-6">
+            {/* Mode Toggle */}
+            <div className="flex gap-4 border-b pb-4">
+              <button
+                onClick={() => {
+                  setImageUploadMode('upload');
+                  setUploadedImage(null);
+                }}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all ${imageUploadMode === 'upload'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+              >
+                <Upload size={18} className="inline mr-2" />
+                Upload from Computer
+              </button>
+              <button
+                onClick={() => setImageUploadMode('url')}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all ${imageUploadMode === 'url'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+              >
+                Use Image URL
+              </button>
+            </div>
+
+            {/* Upload from Computer */}
+            {imageUploadMode === 'upload' ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold mb-3">
+                    Select Image (Recommended: 1:1 aspect ratio for products)
+                  </label>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            setUploadedImage(event.target?.result as string);
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="hidden"
+                      id="imageUpload"
+                    />
+                    <label htmlFor="imageUpload" className="cursor-pointer">
+                      <Upload size={32} className="mx-auto text-gray-400 mb-2" />
+                      <p className="text-gray-700 font-semibold mb-1">Click to upload</p>
+                      <p className="text-sm text-gray-500">or drag and drop</p>
+                      <p className="text-xs text-gray-400 mt-2">PNG, JPG up to 10MB</p>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Image Preview and Crop */}
+                {uploadedImage && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-semibold mb-2">Preview</label>
+                    </div>
+
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <p className="text-sm text-blue-800">
+                        <strong>Aspect Ratio:</strong> 1:1 (Square) is recommended for product images. The image will display at 500x500px in the store.
+                      </p>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => {
+                          if (editingProduct) {
+                            setEditingProduct({
+                              ...editingProduct,
+                              images: [uploadedImage],
+                            });
+                          }
+                          setShowImageUploadModal(false);
+                          setUploadedImage(null);
+                          setCropScale(1);
+                          setCropOffsetX(0);
+                          setCropOffsetY(0);
+                        }}
+                        className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                      >
+                        Use This Image
+                      </button>
+                      <button
+                        onClick={() => {
+                          setUploadedImage(null);
+                          setCropScale(1);
+                          setCropOffsetX(0);
+                          setCropOffsetY(0);
+                        }}
+                        className="flex-1 px-4 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* URL Input Mode */
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Image URL</label>
+                  <input
+                    type="url"
+                    placeholder="https://example.com/image.jpg"
+                    defaultValue={editingProduct?.images?.[0] || ''}
+                    onChange={(e) => {
+                      if (editingProduct) {
+                        setEditingProduct({
+                          ...editingProduct,
+                          images: [e.target.value],
+                        });
+                      }
+                    }}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {editingProduct?.images?.[0] && (
+                  <div>
+                    <label className="block text-sm font-semibold mb-2">Preview</label>
+                    <div className="w-full bg-gray-100 rounded-lg overflow-hidden border border-gray-300">
+                      <div className="relative w-full aspect-square">
+                        <img
+                          src={getIPFSUrl(editingProduct.images[0])}
+                          alt="Preview"
+                          className="w-full h-full object-cover"
+                          onError={() => {
+                            alert('Unable to load image from URL');
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-blue-800">
+                    <strong>Aspect Ratio:</strong> 1:1 (Square) is recommended for product images. The image will display at 500x500px in the store.
+                  </p>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setShowImageUploadModal(false);
+                      setImageUploadMode('upload');
+                    }}
+                    className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </motion.div>
       </div>
@@ -1843,228 +1842,235 @@ export default function StoreEditor() {
 
   // Editor Mode
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Editor Header */}
-      <div className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => router.back()}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <ArrowLeft size={20} weight="bold" />
-              </button>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Store Editor</h1>
-                <p className="text-sm text-gray-500">{storeName}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setIsPreviewMode(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg font-semibold transition-colors"
-              >
-                <Eye size={18} weight="bold" />
-                Preview
-              </button>
-              <button
-                onClick={() => setShowSavePublishModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg font-semibold transition-colors"
-              >
-                <FloppyDisk size={18} weight="bold" />
-                Save & Publish
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-hidden flex gap-6 p-6">
-        {/* Left Sidebar - Settings */}
-        <div className="w-80 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="font-bold text-gray-900">Store Settings</h3>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">Store Name</label>
-              <input
-                type="text"
-                value={storeData.storeName}
-                onChange={(e) => updateStoreData({ storeName: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">Hero Title</label>
-              <textarea
-                value={storeData.heroTitle}
-                onChange={(e) => updateStoreData({ heroTitle: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                rows={2}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">Hero Subtitle</label>
-              <textarea
-                value={storeData.heroSubtitle}
-                onChange={(e) => updateStoreData({ heroSubtitle: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                rows={2}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">Hero Image URL</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={storeData.heroImage}
-                  onChange={(e) => updateStoreData({ heroImage: e.target.value })}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="https://..."
-                />
+    <ProtectedRoute>
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        {/* Editor Header */}
+        <div className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+          <div className="max-w-7xl mx-auto px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
                 <button
-                  onClick={() => {
-                    setShowHeroImageUploadModal(true);
-                    setIsHeroImageUpload(true);
-                  }}
-                  className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  onClick={() => router.back()}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                 >
-                  <Upload size={16} />
-                  Upload
+                  <ArrowLeft size={20} weight="bold" />
+                </button>
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">Store Editor</h1>
+                  <p className="text-sm text-gray-500">{storeName}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setIsPreviewMode(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg font-semibold transition-colors"
+                >
+                  <Eye size={18} weight="bold" />
+                  Preview
+                </button>
+                <button
+                  onClick={() => setShowSavePublishModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg font-semibold transition-colors"
+                >
+                  <FloppyDisk size={18} weight="bold" />
+                  Save & Publish
                 </button>
               </div>
             </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">About Text</label>
-              <textarea
-                value={storeData.aboutText}
-                onChange={(e) => updateStoreData({ aboutText: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                rows={2}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">Contact Email</label>
-              <input
-                type="email"
-                value={storeData.contactEmail}
-                onChange={(e) => updateStoreData({ contactEmail: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-3">Colors</label>
-              <div className="space-y-3">
-                {[
-                  { label: 'Primary Color', key: 'primaryColor' as const },
-                  { label: 'Secondary Color', key: 'secondaryColor' as const },
-                  { label: 'Accent Color', key: 'accentColor' as const },
-                ].map((color) => (
-                  <div key={color.key}>
-                    <label className="text-xs text-gray-600 mb-1 block">{color.label}</label>
-                    <input
-                      type="color"
-                      value={storeData[color.key]}
-                      onChange={(e) => updateStoreData({ [color.key]: e.target.value })}
-                      className="w-full h-10 rounded cursor-pointer"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         </div>
 
-        {/* Center - Preview */}
-        <div className="flex-1 overflow-auto bg-white rounded-lg shadow-sm border border-gray-200">
-          <div className="min-h-full" style={{ backgroundColor: storeData.primaryColor }}>
-            <Navbar />
-            <div className="max-w-7xl mx-auto px-6 py-8">
-              {renderStorePage()}
-              <div className="mt-16">
-                <Footer />
-              </div>
+        <div className="flex-1 overflow-hidden flex gap-6 p-6">
+          {/* Left Sidebar - Settings */}
+          <div className="w-80 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="font-bold text-gray-900">Store Settings</h3>
             </div>
-          </div>
-        </div>
 
-        {/* Right Sidebar - Products Manager */}
-        <div className="w-80 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col">
-          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-            <h3 className="font-bold text-gray-900">Products ({storeData.products.length})</h3>
-            <button
-              onClick={addNewProduct}
-              className="p-2 hover:bg-gray-100 rounded-lg text-blue-600"
-              title="Add new product"
-            >
-              <Plus size={20} weight="bold" />
-            </button>
-          </div>
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">Store Name</label>
+                <input
+                  type="text"
+                  value={storeData.storeName}
+                  onChange={(e) => updateStoreData({ storeName: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {storeData.products.map((product) => (
-              <motion.div
-                key={product.id}
-                className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors group"
-                whileHover={{ scale: 1.02 }}
-              >
-                <div className="flex gap-3 items-start">
-                  <img
-                    src={product.image}
-                    alt={product.name}
-                    className="w-12 h-12 rounded object-cover shrink-0"
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">Hero Title</label>
+                <textarea
+                  value={storeData.heroTitle}
+                  onChange={(e) => updateStoreData({ heroTitle: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={2}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">Hero Subtitle</label>
+                <textarea
+                  value={storeData.heroSubtitle}
+                  onChange={(e) => updateStoreData({ heroSubtitle: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={2}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">Hero Image URL</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={storeData.heroImage}
+                    onChange={(e) => updateStoreData({ heroImage: e.target.value })}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="https://..."
                   />
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-semibold text-gray-900 truncate">
-                      {product.name}
-                    </h4>
-                    <p className="text-xs text-gray-500">${product.price.toFixed(2)}</p>
-                    <span className="text-xs text-gray-600">{product.category}</span>
-                  </div>
-                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => {
-                        setEditingProduct(product);
-                        setShowProductModal(true);
-                      }}
-                      className="p-1 hover:bg-blue-100 text-blue-600 rounded"
-                      title="Edit"
-                    >
-                      <PencilSimple size={16} weight="bold" />
-                    </button>
-                    <button
-                      onClick={() => deleteProduct(product.id)}
-                      className="p-1 hover:bg-red-100 text-red-600 rounded"
-                      title="Delete"
-                    >
-                      <Trash size={16} />
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => {
+                      setShowHeroImageUploadModal(true);
+                      setIsHeroImageUpload(true);
+                    }}
+                    className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  >
+                    <Upload size={16} />
+                    Upload
+                  </button>
                 </div>
-              </motion.div>
-            ))}
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-3">About Text</label>
+                <textarea
+                  value={storeData.aboutText}
+                  onChange={(e) => updateStoreData({ aboutText: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={2}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-3">Contact Email</label>
+                <input
+                  type="email"
+                  value={storeData.contactEmail}
+                  onChange={(e) => updateStoreData({ contactEmail: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-3">Colors</label>
+                <div className="space-y-3">
+                  {[
+                    { label: 'Primary Color', key: 'primaryColor' as const },
+                    { label: 'Secondary Color', key: 'secondaryColor' as const },
+                    { label: 'Accent Color', key: 'accentColor' as const },
+                  ].map((color) => (
+                    <div key={color.key}>
+                      <label className="text-xs text-gray-600 mb-1 block">{color.label}</label>
+                      <input
+                        type="color"
+                        value={storeData[color.key]}
+                        onChange={(e) => updateStoreData({ [color.key]: e.target.value })}
+                        className="w-full h-10 rounded cursor-pointer"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Center - Preview */}
+          <div className="flex-1 overflow-auto bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="min-h-full" style={{ backgroundColor: storeData.primaryColor }}>
+              <Navbar />
+              <div className="max-w-7xl mx-auto px-6 py-8">
+                {renderStorePage()}
+                <div className="mt-16">
+                  <Footer />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Sidebar - Products Manager */}
+          <div className="w-80 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="font-bold text-gray-900">Products ({storeData.products.length})</h3>
+              <button
+                onClick={addNewProduct}
+                className="p-2 hover:bg-gray-100 rounded-lg text-blue-600"
+                title="Add new product"
+              >
+                <Plus size={20} weight="bold" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {storeData.products.map((product) => {
+                const productImage = product.images.length > 0 ? getIPFSUrl(product.images[0]) : 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+                const productCategory = product.metadata?.category || 'General';
+
+                return (
+                  <motion.div
+                    key={product.id}
+                    className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors group"
+                    whileHover={{ scale: 1.02 }}
+                  >
+                    <div className="flex gap-3 items-start">
+                      <img
+                        src={productImage}
+                        alt={product.name}
+                        className="w-12 h-12 rounded object-cover shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-semibold text-gray-900 truncate">
+                          {product.name}
+                        </h4>
+                        <p className="text-xs text-gray-500">${product.price.toFixed(2)}</p>
+                        <span className="text-xs text-gray-600">{productCategory}</span>
+                      </div>
+                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => {
+                            setEditingProduct(product);
+                            setShowProductModal(true);
+                          }}
+                          className="p-1 hover:bg-blue-100 text-blue-600 rounded"
+                          title="Edit"
+                        >
+                          <PencilSimple size={16} weight="bold" />
+                        </button>
+                        <button
+                          onClick={() => deleteProduct(product.id)}
+                          className="p-1 hover:bg-red-100 text-red-600 rounded"
+                          title="Delete"
+                        >
+                          <Trash size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
           </div>
         </div>
-      </div>
 
-      <ProductEditModal />
-      <ImageUploadModal />
-      <HeroImageUploadModal />
-      <SavePublishModal
-        isOpen={showSavePublishModal}
-        onClose={() => setShowSavePublishModal(false)}
-        onPublish={handlePublish}
-        initialStoreName={storeData.storeName}
-      />
-    </div>
+        <ProductEditModal />
+        <ImageUploadModal />
+        <HeroImageUploadModal />
+        <SavePublishModal
+          isOpen={showSavePublishModal}
+          onClose={() => setShowSavePublishModal(false)}
+          onPublish={handlePublish}
+          initialStoreName={storeData.storeName}
+        />
+      </div>
+    </ProtectedRoute>
   );
 }

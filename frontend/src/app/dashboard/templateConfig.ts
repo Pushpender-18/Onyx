@@ -41,6 +41,7 @@ export interface TemplateConfig {
   aboutText: string;
   contactEmail: string;
   navItems: Array<{
+    id: string;
     label: string;
     page: 'home' | 'shop' | 'about' | 'contact';
     icon: React.ComponentType;
@@ -68,10 +69,10 @@ export const TEMPLATES: Record<string, TemplateConfig> = {
     aboutText: 'We believe in craftsmanship and quality.',
     contactEmail: 'hello@store.com',
     navItems: [
-      { label: 'HOME', page: 'home', icon: House },
-      { label: 'SHOP', page: 'shop', icon: Storefront },
-      { label: 'ABOUT', page: 'about', icon: Question },
-      { label: 'CONTACT', page: 'contact', icon: EnvelopeSimple },
+      { id: 'home', label: 'HOME', page: 'home', icon: House },
+      { id: 'shop', label: 'SHOP', page: 'shop', icon: Storefront },
+      { id: 'about', label: 'ABOUT', page: 'about', icon: Question },
+      { id: 'contact', label: 'CONTACT', page: 'contact', icon: EnvelopeSimple },
     ],
   },
 
@@ -99,11 +100,11 @@ export const TEMPLATES: Record<string, TemplateConfig> = {
     aboutText: 'Discover cutting-edge technology at unbeatable prices. We offer the latest gadgets and devices from trusted brands.',
     contactEmail: 'support@techhub.com',
     navItems: [
-      { label: 'HOME', page: 'home', icon: House },
-      { label: 'SHOP', page: 'shop', icon: Storefront },
-      { label: 'DEALS', page: 'shop', icon: Lightning },
-      { label: 'ABOUT', page: 'about', icon: Question },
-      { label: 'CONTACT', page: 'contact', icon: EnvelopeSimple },
+      { id: 'home', label: 'HOME', page: 'home', icon: House },
+      { id: 'shop', label: 'SHOP', page: 'shop', icon: Storefront },
+      { id: 'deals', label: 'DEALS', page: 'shop', icon: Lightning },
+      { id: 'about', label: 'ABOUT', page: 'about', icon: Question },
+      { id: 'contact', label: 'CONTACT', page: 'contact', icon: EnvelopeSimple },
     ],
     heroGradient: 'linear-gradient(135deg, rgba(10, 14, 39, 0.8) 0%, rgba(26, 31, 58, 0.6) 100%)',
     navGradient: 'linear-gradient(90deg, #0a0e27 0%, #1a1f3a 100%)',

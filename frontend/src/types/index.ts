@@ -18,14 +18,29 @@ export interface Store {
   updatedAt: Date;
 }
 
+// export interface StoreCustomization {
+//   primaryColor: string;
+//   secondaryColor: string;
+//   layout: LayoutElement[];
+//   fonts: {
+//     heading: string;
+//     body: string;
+//   };
+// }
+
 export interface StoreCustomization {
+  storeName: string;
+  heroTitle: string;
+  heroSubtitle: string;
+  heroImage: string;
+  products: Product[];
+  categories: string[];
   primaryColor: string;
   secondaryColor: string;
-  layout: LayoutElement[];
-  fonts: {
-    heading: string;
-    body: string;
-  };
+  accentColor: string;
+  textColor?: string;
+  aboutText: string;
+  contactEmail: string;
 }
 
 export interface LayoutElement {
@@ -69,6 +84,7 @@ export interface Product {
   name: string;
   description: string;
   price: number;
+  stock: number;
   images: string[]; // IPFS hashes
   metadata: {
     sku?: string;
@@ -79,6 +95,20 @@ export interface Product {
   createdAt: Date;
   updatedAt: Date;
   ipfsHash?: string;
+}
+
+export interface Order {
+  buyer: string;
+  itemId: number;
+  quantity: number;
+  totalPrice: number;
+  timestamp: number;
+  isDelivered: boolean;
+}
+
+export interface CartItem {
+  id: string;
+  quantity: number;
 }
 
 export interface CanvasElement extends LayoutElement {

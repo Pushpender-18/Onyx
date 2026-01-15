@@ -2,20 +2,25 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useWeb3Auth } from '@/context/Web3AuthContext';
+import { useWeb3AuthConnect, useWeb3AuthDisconnect } from '@web3auth/modal/react';
 import { useRouter, usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { List, X, SignOut, Wallet } from 'phosphor-react';
+import { useConnection } from 'wagmi';
 
 export default function Navigation() {
-  const { isAuthenticated, walletAddress, login, logout, isLoading } = useWeb3Auth();
+  const { connect, loading, isConnected, error } = useWeb3AuthConnect();
+  const { disconnect } = useWeb3AuthDisconnect();
+  const { address } = useConnection();
+  const walletAddress = address ? address : " ";  
+
   const router = useRouter();
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const handleLogin = async () => {
     try {
-      await login();
+      await connect();
       router.push('/dashboard');
     } catch (error) {
       console.error('Login failed:', error);
@@ -24,14 +29,14 @@ export default function Navigation() {
 
   const handleLogout = async () => {
     try {
-      await logout();
+      await disconnect();
       router.push('/');
     } catch (error) {
       console.error('Logout failed:', error);
     }
   };
 
-  const isDashboard = pathname.startsWith('/dashboard');
+  // const isDashboard = pathname.startsWith('/dashboard');
 
   return (
     <nav className="sticky top-0 z-50 bg-(--onyx-white) border-b border-(--onyx-grey-lighter)">
@@ -52,7 +57,7 @@ export default function Navigation() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
-            {isAuthenticated && (
+            {isConnected && (
               <>
                 <Link
                   href="/dashboard"
@@ -61,7 +66,7 @@ export default function Navigation() {
                       ? 'text-(--onyx-stone)'
                       : 'text-(--onyx-grey) hover:text-(--onyx-stone)'
                   }`}
-                >
+                > {loading}
                   Dashboard
                 </Link>
                 <Link
@@ -90,7 +95,7 @@ export default function Navigation() {
 
           {/* Right Side Actions */}
           <div className="flex items-center gap-3 md:gap-4">
-            {isAuthenticated ? (
+            {isConnected ? (
               <>
                 {/* Wallet Address */}
                 <div className="hidden sm:flex items-center gap-2 px-3 py-2 bg-(--onyx-grey-lighter) rounded-lg">
@@ -103,7 +108,7 @@ export default function Navigation() {
                 {/* Logout Button */}
                 <button
                   onClick={handleLogout}
-                  disabled={isLoading}
+                  disabled={loading}
                   className="btn-secondary text-sm flex items-center gap-2"
                 >
                   <SignOut size={16} weight="bold" />
@@ -113,10 +118,10 @@ export default function Navigation() {
             ) : (
               <button
                 onClick={handleLogin}
-                disabled={isLoading}
+                disabled={loading}
                 className="btn-primary text-sm"
               >
-                {isLoading ? 'Connecting...' : 'Connect Wallet'}
+                {loading ? 'Connecting...' : 'Connect Wallet'}
               </button>
             )}
 
@@ -145,7 +150,7 @@ export default function Navigation() {
           className="md:hidden overflow-hidden"
         >
           <div className="px-4 py-4 space-y-3 border-t border-(--onyx-grey-lighter)">
-            {isAuthenticated && (
+            {isConnected && (
               <>
                 <Link
                   href="/dashboard"

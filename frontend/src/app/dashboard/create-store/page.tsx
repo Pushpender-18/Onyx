@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -13,6 +14,9 @@ import {
   FiShoppingCart,
   FiSettings,
 } from 'react-icons/fi';
+import { useShop } from '@/context/ShopContext';
+import { useWeb3Auth } from '@web3auth/modal/react';
+import { ethers } from 'ethers';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -52,9 +56,12 @@ const TEMPLATES = [
 
 export default function CreateStore() {
   const router = useRouter();
+  const { createStore: createShopStore, isLoading } = useShop();
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [storeName, setStoreName] = useState('');
   const [storeDescription, setStoreDescription] = useState('');
+  const {provider} = useWeb3Auth();
+  const web3Provider = new ethers.BrowserProvider(provider as any);
 
   const handleCreateStore = async () => {
     if (!selectedTemplate || !storeName) {
@@ -62,21 +69,42 @@ export default function CreateStore() {
       return;
     }
 
-    // Simulate store creation
-    console.log('Creating store:', {
-      template: selectedTemplate,
-      name: storeName,
-      description: storeDescription,
-    });
+    try {
+      // Create configuration object
+      const configuration = JSON.stringify({
+        template: selectedTemplate,
+        layout: [],
+      });
 
-    // Redirect to editor
-    router.push(`/dashboard/editor?template=${selectedTemplate}&storeName=${storeName}`);
+      const chainId = (await web3Provider.getNetwork()).chainId;
+      console.log('Connected to chain ID:', chainId);
+      const signer = await web3Provider.getSigner();
+      // Create store via blockchain and update local state
+      const result = await createShopStore(
+        storeName,
+        selectedTemplate,
+        storeDescription,
+        configuration, 
+        signer
+      );
+
+      if (result) {
+        // Redirect to editor
+        router.push(`/dashboard/editor?template=${selectedTemplate}&storeName=${storeName}`);
+      } else {
+        alert('Failed to create store. Please try again.');
+      }
+    } catch (error: any) {
+      console.error('Error creating store:', error);
+      alert(`Failed to create store: ${error.message || 'Unknown error'}`);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-(--onyx-white)">
-      {/* Header */}
-      <motion.div
+    <ProtectedRoute>
+      <div className="min-h-screen bg-(--onyx-white)">
+        {/* Header */}
+        <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         className="border-b border-(--onyx-grey-lighter)"
@@ -97,6 +125,7 @@ export default function CreateStore() {
       </motion.div>
 
       <div className="container-custom py-12">
+        
         {/* Store Details */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -219,13 +248,21 @@ export default function CreateStore() {
           </Link>
           <button
             onClick={handleCreateStore}
-            disabled={!selectedTemplate || !storeName}
-            className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={!selectedTemplate || !storeName || isLoading}
+            className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            Create Store
+            {isLoading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Creating...
+              </>
+            ) : (
+              'Create Store'
+            )}
           </button>
         </motion.div>
       </div>
     </div>
+    </ProtectedRoute>
   );
 }
