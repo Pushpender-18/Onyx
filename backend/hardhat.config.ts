@@ -18,7 +18,7 @@ export default defineConfig({
     testnet: {
       url: process.env.TESTNET_URL || "",
       type: "http",
-      accounts: process.env.TESTNET_ACCOUNTS ? JSON.parse(process.env.TESTNET_ACCOUNTS) : [],
+      accounts: process.env.TESTNET_ACCOUNTS ? [process.env.TESTNET_ACCOUNTS] : [],
     }
   }
 });

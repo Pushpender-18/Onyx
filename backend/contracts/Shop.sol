@@ -17,6 +17,18 @@ contract Shop {
 		orderCount = 0;
 	}
 
+	// Update Shop UI Configuration
+	function updateShopConfiguration(string memory _newConfig, string memory _shopName) external {
+		require(msg.sender == shopDetails.owner, "Only owner can update shop configuration"); // Access control [Only the shop owner can update configuration]
+		shopDetails.configuration = _newConfig;
+		shopDetails.shopName = _shopName;
+	}
+
+	// Return shop details
+	function getShopDetails() external view returns (ShopDetails memory) {
+		return shopDetails;
+	}
+
 	// Adds a new product to the shop.
 	function addProduct(Item memory _item) external {
 		require(msg.sender == shopDetails.owner, "Only owner can add products"); // Access control [Only the shop owner can add products]
@@ -58,6 +70,8 @@ contract Shop {
 		require(msg.sender == shopDetails.owner, "Only owner can update products");	// Access control [Only the shop owner can update products]
 		require(_itemIndex < productCount, "Product does not exist");		// Validity check
 		
+		items[_itemIndex].name = _item.name;
+		items[_itemIndex].description = _item.description;
 		items[_itemIndex].price = _item.price;
 		items[_itemIndex].stock = _item.stock;
 		items[_itemIndex].isActive = _item.isActive;
@@ -76,9 +90,56 @@ contract Shop {
 		items[_itemId].updatedAt = _currentDate;
 	}
 
-	// Creates a new order for a product.
-	function createTransaction() external {
-		// Implementation pending
+	// Creates new orders for multiple products in a single transaction
+	function createTransaction(
+		string[] memory _itemIds,
+		uint256[] memory _quantities,
+		uint256[] memory _prices,
+		string memory _timestamp,
+		string memory _txnHash
+	) external {
+		require(_itemIds.length == _quantities.length, "Item IDs and quantities length mismatch");
+		require(_itemIds.length == _prices.length, "Item IDs and prices length mismatch");
+		require(_itemIds.length > 0, "No items provided");
+		
+		// Create an order for each item
+		for (uint256 i = 0; i < _itemIds.length; i++) {
+			string memory itemId = _itemIds[i];
+			uint256 quantity = _quantities[i];
+			uint256 totalPrice = _prices[i];
+			
+			// Find the item by its string ID
+			bool itemFound = false;
+			uint256 itemIndex = 0;
+			for (uint256 j = 0; j < productCount; j++) {
+				if (keccak256(bytes(items[j].id)) == keccak256(bytes(itemId))) {
+					itemFound = true;
+					itemIndex = j;
+					break;
+				}
+			}
+			
+			// Validate item
+			require(itemFound, "Product does not exist");
+			require(items[itemIndex].isActive, "Product is not active");
+			require(items[itemIndex].stock >= quantity, "Insufficient stock");
+			
+			// Create the order
+			orders[orderCount] = Order({
+				buyer: msg.sender,
+				itemId: itemId,
+				quantity: quantity,
+				totalPrice: totalPrice,
+				timestamp: _timestamp,
+				txnHash: _txnHash
+			});
+			
+			// Update stock
+			items[itemIndex].stock -= quantity;
+			
+			// Increment order count
+			orderCount++;
+		}
 	}
 
 	// Return product count
@@ -102,5 +163,24 @@ contract Shop {
 			itemList[i] = items[i];
 		}
 		return itemList;
+	}
+
+	// Publish the shop (make it live)
+	function publishShop() external {
+		require(msg.sender == shopDetails.owner, "Only owner can publish shop");
+		require(!shopDetails.isPublished, "Shop is already published");
+		shopDetails.isPublished = true;
+	}
+
+	// Unpublish the shop (take it offline)
+	function unpublishShop() external {
+		require(msg.sender == shopDetails.owner, "Only owner can unpublish shop");
+		require(shopDetails.isPublished, "Shop is not published");
+		shopDetails.isPublished = false;
+	}
+
+	// Check if shop is published
+	function isShopPublished() external view returns (bool) {
+		return shopDetails.isPublished;
 	}
 }

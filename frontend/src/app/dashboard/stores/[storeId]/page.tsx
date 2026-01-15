@@ -130,7 +130,7 @@ export default function StoreDetailsPage() {
               View Storefront
             </button>
             <button
-              onClick={() => router.push(`/dashboard/stores/${storeId}/edit`)}
+              onClick={() => router.push(`/dashboard/editor?storeId=${storeId}&storeName=${encodeURIComponent(store.name)}&template=${store.templateId}`)}
               className="px-6 py-3 bg-(--onyx-white) text-(--onyx-stone) border-2 border-(--onyx-stone) rounded-lg hover:bg-(--onyx-grey-lighter) transition-colors flex items-center gap-2"
             >
               <GearSix size={18} weight="bold" />
@@ -266,7 +266,7 @@ export default function StoreDetailsPage() {
           className="bg-amber-50 border-2 border-(--warning) rounded-lg p-6 mb-8"
         >
           <div className="flex items-start gap-4">
-            <div className="text-3xl">⚠️</div>
+            <div className="text-3xl"></div>
             <div className="flex-1">
               <h3 className="text-lg font-semibold text-(--onyx-dark) mb-2">
                 Store is in Draft Mode
@@ -308,7 +308,7 @@ export default function StoreDetailsPage() {
 
         {storeProducts.length === 0 ? (
           <div className="text-center py-12">
-            <div className="text-6xl mb-4">📦</div>
+            <div className="text-6xl mb-4"></div>
             <h3 className="text-xl font-semibold text-(--onyx-dark) mb-2">No Products Yet</h3>
             <p className="text-(--onyx-grey) mb-4">Start adding products to your store</p>
             <button
@@ -411,7 +411,7 @@ export default function StoreDetailsPage() {
             className="bg-white rounded-lg p-8 max-w-md w-full shadow-2xl"
           >
             <div className="text-center mb-6">
-              <div className="text-6xl mb-4">⚠️</div>
+              <div className="text-6xl mb-4"></div>
               <h2 className="text-2xl font-bold text-(--onyx-dark) mb-2">
                 Hide Store?
               </h2>

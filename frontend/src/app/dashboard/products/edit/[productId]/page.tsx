@@ -1,0 +1,655 @@
+'use client';
+
+import React, { useState, useEffect, useRef } from 'react';
+import { useRouter, useSearchParams, useParams } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowLeft, Upload, FloppyDisk, X, Image as ImageIcon } from 'phosphor-react';
+import { useShop } from '@/context/ShopContext';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
+import toast from 'react-hot-toast';
+import { uploadImageToIPFS, getIPFSUrl } from '@/lib/ipfs-upload';
+import { Product } from '@/types';
+
+export default function EditProductPage() {
+  const router = useRouter();
+  const params = useParams();
+  const searchParams = useSearchParams();
+  const productId = params.productId as string;
+  const storeId = searchParams.get('storeId');
+  const returnUrl = searchParams.get('returnUrl') || '/dashboard/products';
+
+  const { products, updateProductOnBlockchain } = useShop();
+  const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Image upload states
+  const [showImageEditor, setShowImageEditor] = useState(false);
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [croppedImage, setCroppedImage] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
+  // Product form state
+  const [productData, setProductData] = useState({
+    name: '',
+    description: '',
+    price: '',
+    category: 'Electronics',
+    image: '',
+    stock: 0,
+  });
+
+  const categories = [
+    'Electronics',
+    'Fashion',
+    'Home & Garden',
+    'Sports',
+    'Books',
+    'Toys',
+    'Food & Beverage',
+    'General',
+  ];
+
+  // Load product info
+  useEffect(() => {
+    if (!productId || !storeId) {
+      toast.error('Missing product or store information');
+      setLoading(false);
+      return;
+    }
+
+    // Find the product from context
+    const product = products.find(p => p.id === productId && p.storeId === storeId);
+    
+    if (!product) {
+      toast.error('Product not found');
+      setLoading(false);
+      return;
+    }
+
+    setCurrentProduct(product);
+    
+    // Set form data from product
+    setProductData({
+      name: product.name,
+      description: product.description,
+      price: product.price.toString(),
+      category: product.metadata?.category || 'Electronics',
+      image: product.images && product.images.length > 0 ? getIPFSUrl(product.images[0]) : '',
+      stock: product.stock,
+    });
+
+    setLoading(false);
+  }, [productId, storeId, products]);
+
+  const handleInputChange = (field: string, value: string) => {
+    setProductData(prev => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  // Handle file upload
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const imageDataUrl = event.target?.result as string;
+      setUploadedImage(imageDataUrl);
+      setShowImageEditor(true);
+      setZoom(1);
+      setPosition({ x: 0, y: 0 });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Handle image cropping
+  const handleCropImage = () => {
+    if (!imageRef.current || !uploadedImage) return;
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const img = imageRef.current;
+    const containerSize = 400;
+    canvas.width = containerSize;
+    canvas.height = containerSize;
+
+    // Calculate dimensions for cropping
+    const naturalWidth = img.naturalWidth;
+    const naturalHeight = img.naturalHeight;
+    const minDimension = Math.min(naturalWidth, naturalHeight);
+    
+    // Calculate source crop area (centered square)
+    const sx = (naturalWidth - minDimension) / 2;
+    const sy = (naturalHeight - minDimension) / 2;
+
+    // Apply zoom by adjusting the source crop size
+    const cropSize = minDimension / zoom;
+    const cropX = sx + position.x;
+    const cropY = sy + position.y;
+
+    // Draw the cropped image
+    ctx.drawImage(
+      img,
+      cropX,
+      cropY,
+      cropSize,
+      cropSize,
+      0,
+      0,
+      containerSize,
+      containerSize
+    );
+
+    const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+    setCroppedImage(croppedDataUrl);
+    setProductData(prev => ({ ...prev, image: croppedDataUrl }));
+    setShowImageEditor(false);
+    toast.success('Image cropped successfully');
+  };
+
+  // Handle mouse drag
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    const newX = e.clientX - dragStart.x;
+    const newY = e.clientY - dragStart.y;
+    setPosition({ x: newX, y: newY });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleCancelCrop = () => {
+    setShowImageEditor(false);
+    setUploadedImage(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!currentProduct || !storeId) {
+      toast.error('Product or store not found. Please try again.');
+      return;
+    }
+
+    if (!productData.name || !productData.price) {
+      toast.error('Please fill in product name and price');
+      return;
+    }
+
+    const price = parseFloat(productData.price);
+    if (isNaN(price) || price <= 0) {
+      toast.error('Please enter a valid price');
+      return;
+    }
+
+    setSaving(true);
+    
+    // Show initial transaction toast
+    const loadingToast = toast.loading('Preparing transaction...');
+    
+    try {
+      console.log('✏️ Updating product:', productData);
+      console.log('Store ID (contract address):', storeId);
+      console.log('Product ID:', currentProduct.id);
+      
+      // Handle image update
+      let imageHash = currentProduct.images && currentProduct.images.length > 0 
+        ? currentProduct.images[0] 
+        : '';
+
+      // If image was changed (base64 data url or new url), upload to IPFS
+      if (productData.image && (productData.image.startsWith('data:') || productData.image !== getIPFSUrl(imageHash))) {
+        // Check if it's a data URL (new image) vs IPFS URL (existing image)
+        if (productData.image.startsWith('data:')) {
+          toast.loading('Uploading image to IPFS...', { id: loadingToast });
+          console.log('📤 Uploading product image to IPFS...');
+          
+          const ipfsResult = await uploadImageToIPFS(productData.image);
+          
+          if (!ipfsResult.success) {
+            throw new Error(ipfsResult.error || 'Failed to upload image to IPFS');
+          }
+          
+          imageHash = ipfsResult.hash;
+          console.log('✅ Image uploaded to IPFS:', imageHash);
+          console.log('🔗 Image URL:', ipfsResult.url);
+        }
+      }
+      
+      // Update toast to show MetaMask is needed
+      toast.loading('Please confirm transaction in MetaMask...', { id: loadingToast });
+      
+      const updatedProduct = await updateProductOnBlockchain(storeId, {
+        ...currentProduct,
+        name: productData.name,
+        price: price,
+        stock: productData.stock,
+        description: productData.description,
+        images: imageHash ? [imageHash] : [],
+        metadata: {
+          category: productData.category,
+          tags: currentProduct.metadata?.tags || [],
+        },
+      });
+
+      if (updatedProduct) {
+        toast.success('Product updated successfully!', { id: loadingToast });
+        console.log('✅ Product saved:', updatedProduct);
+        
+        // Wait a moment for the user to see the success message
+        setTimeout(() => {
+          router.push(returnUrl);
+        }, 1000);
+      } else {
+        toast.error('Failed to update product', { id: loadingToast });
+      }
+    } catch (error: any) {
+      console.error('❌ Error updating product:', error);
+      
+      let errorMessage = 'Failed to update product';
+      if (error.message?.includes('rejected')) {
+        errorMessage = 'Transaction rejected';
+      } else if (error.message?.includes('insufficient funds')) {
+        errorMessage = 'Insufficient funds for gas';
+      } else if (error.message?.includes('Only owner')) {
+        errorMessage = 'Only store owner can update products';
+      } else if (error.message?.includes('IPFS')) {
+        errorMessage = error.message; // Show IPFS upload errors
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage, { id: loadingToast });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <ProtectedRoute>
+      {loading ? (
+        <div className="min-h-screen flex items-center justify-center bg-(--onyx-white)">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-(--onyx-stone) mx-auto mb-4"></div>
+            <p className="text-(--onyx-grey) font-medium">Loading product information...</p>
+          </div>
+        </div>
+      ) : !currentProduct || !storeId ? (
+        <div className="min-h-screen flex items-center justify-center bg-(--onyx-white)">
+          <div className="text-center">
+            <h1 className="text-3xl font-bold text-(--onyx-stone) mb-2">Product Not Found</h1>
+            <p className="text-(--onyx-grey) mb-6">
+              Unable to load product information. Please try again.
+            </p>
+            <button
+              onClick={() => router.push('/dashboard/products')}
+              className="btn-primary"
+            >
+              Back to Products
+            </button>
+          </div>
+        </div>
+      ) : (
+      <div className="min-h-screen bg-(--onyx-white)">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="border-b border-(--onyx-grey-lighter) bg-white"
+        >
+          <div className="container-custom py-6">
+            <button
+              onClick={() => router.back()}
+              className="inline-flex items-center gap-2 text-(--onyx-grey) hover:text-(--onyx-dark) transition-colors mb-4"
+            >
+              <ArrowLeft size={18} weight="bold" />
+              Back
+            </button>
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-4xl font-bold text-(--onyx-stone)">Edit Product</h1>
+                <p className="text-(--onyx-grey) mt-2">
+                  Updating: <span className="font-semibold text-(--onyx-dark)">{currentProduct.name}</span>
+                </p>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Form Content */}
+        <div className="container-custom py-12">
+          <div className="max-w-3xl mx-auto">
+            <motion.form
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              onSubmit={handleSubmit}
+              className="bg-white rounded-lg border border-(--onyx-grey-lighter) shadow-sm p-8 space-y-6"
+            >
+              {/* Product Name */}
+              <div>
+                <label className="block text-sm font-semibold text-(--onyx-dark) mb-2">
+                  Product Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={productData.name}
+                  onChange={(e) => handleInputChange('name', e.target.value)}
+                  placeholder="Enter product name"
+                  className="input-field"
+                  required
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-semibold text-(--onyx-dark) mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={productData.description}
+                  onChange={(e) => handleInputChange('description', e.target.value)}
+                  placeholder="Describe your product"
+                  className="input-field"
+                  rows={4}
+                />
+              </div>
+
+              {/* Price and Category Row */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Price */}
+                <div>
+                  <label className="block text-sm font-semibold text-(--onyx-dark) mb-2">
+                    Price <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-(--onyx-grey)">$</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={productData.price}
+                      onChange={(e) => handleInputChange('price', e.target.value)}
+                      placeholder="0.00"
+                      className="input-field pl-8"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Category */}
+                <div>
+                  <label className="block text-sm font-semibold text-(--onyx-dark) mb-2">
+                    Category
+                  </label>
+                  <select
+                    value={productData.category}
+                    onChange={(e) => handleInputChange('category', e.target.value)}
+                    className="input-field"
+                  >
+                    {categories.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Stock Counter */}
+              <div>
+                <label className="block text-sm font-semibold text-(--onyx-dark) mb-2">
+                  Stock Quantity
+                </label>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setProductData(prev => ({ ...prev, stock: Math.max(0, Number(prev.stock) - 1) }))}
+                    className="w-12 h-12 flex items-center justify-center bg-(--onyx-grey-lighter) hover:bg-(--onyx-grey-light) text-(--onyx-dark) rounded-lg font-bold text-xl transition-colors"
+                  >
+                    −
+                  </button>
+                    <input
+                    type="number"
+                    min="0"
+                    value={productData.stock}
+                    onChange={(e) => setProductData(prev => ({ ...prev, stock: Math.max(0, parseInt(e.target.value) || 0) }))}
+                    className="input-field text-center font-semibold text-lg flex-1 max-w-16 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                  <button
+                    type="button"
+                    onClick={() => setProductData(prev => ({ ...prev, stock: Number(prev.stock) + 1 }))}
+                    className="w-12 h-12 flex items-center justify-center bg-(--onyx-stone) hover:bg-(--onyx-dark) text-white rounded-lg font-bold text-xl transition-colors"
+                  >
+                    +
+                  </button>
+                  <span className="text-sm text-(--onyx-grey) ml-2">units available</span>
+                </div>
+              </div>
+
+              {/* Product Image */}
+              <div>
+                <label className="block text-sm font-semibold text-(--onyx-dark) mb-3">
+                  Product Image
+                </label>
+                
+                {/* Image Preview */}
+                {productData.image && !showImageEditor && (
+                  <div className="mb-4">
+                    <div className="relative w-full min-h-screen bg-(--onyx-grey-lighter) rounded-lg overflow-hidden border border-(--onyx-grey-light)">
+                      <img
+                        src={productData.image}
+                        alt="Product preview"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setProductData(prev => ({ ...prev, image: '' }))}
+                        className="absolute top-2 right-2 p-2 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors"
+                      >
+                        <X size={16} weight="bold" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
+                {/* File Upload Button */}
+                <div className="flex gap-3 mb-3">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-2 px-4 py-2 bg-(--onyx-stone) text-white rounded-lg hover:bg-(--onyx-dark) transition-colors"
+                  >
+                    <Upload size={18} weight="bold" />
+                    Upload from Device
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const url = prompt('Enter image URL:');
+                      if (url) {
+                        setProductData(prev => ({ ...prev, image: url }));
+                      }
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 border border-(--onyx-grey-light) text-(--onyx-dark) rounded-lg hover:bg-(--onyx-grey-lighter) transition-colors"
+                  >
+                    <ImageIcon size={18} weight="bold" />
+                    Use URL
+                  </button>
+                </div>
+
+                <p className="text-xs text-(--onyx-grey)">
+                  💡 Recommended: 1:1 aspect ratio (square) • 500x500px or larger
+                </p>
+              </div>
+
+              {/* Info Box */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm text-blue-800">
+                  <span className="font-semibold">ℹ️ Note:</span> Changes to this product will be updated on the blockchain and reflected immediately on your published store.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-4 pt-4">
+                <button
+                  type="button"
+                  onClick={() => router.back()}
+                  className="flex-1 btn-secondary"
+                  disabled={saving}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 btn-primary flex items-center justify-center gap-2"
+                  disabled={saving}
+                >
+                  {saving ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <FloppyDisk size={18} weight="bold" />
+                      Update Product
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.form>
+          </div>
+        </div>
+
+        {/* Image Editor Modal */}
+        <AnimatePresence>
+          {showImageEditor && uploadedImage && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4"
+              onClick={handleCancelCrop}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white rounded-lg p-6 max-w-2xl w-full"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-bold text-(--onyx-stone)">Crop Image</h3>
+                  <button
+                    onClick={handleCancelCrop}
+                    className="p-2 hover:bg-(--onyx-grey-lighter) rounded-full transition-colors"
+                  >
+                    <X size={24} weight="bold" />
+                  </button>
+                </div>
+
+                {/* Image Editor Area */}
+                <div className="mb-6">
+                  <div
+                    className="relative w-full aspect-square bg-(--onyx-grey-lighter) rounded-lg overflow-hidden border-2 border-(--onyx-grey-light) cursor-move"
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={handleMouseUp}
+                  >
+                    <img
+                      ref={imageRef}
+                      src={uploadedImage}
+                      alt="Upload preview"
+                      className="absolute"
+                      style={{
+                        transform: `translate(${position.x}px, ${position.y}px) scale(${zoom})`,
+                        transformOrigin: 'top left',
+                        maxWidth: 'none',
+                        width: '100%',
+                        height: 'auto',
+                      }}
+                      draggable={false}
+                    />
+                  </div>
+
+                  {/* Zoom Control */}
+                  <div className="mt-4">
+                    <label className="block text-sm font-semibold text-(--onyx-dark) mb-2">
+                      Zoom: {zoom.toFixed(1)}x
+                    </label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="3"
+                      step="0.1"
+                      value={zoom}
+                      onChange={(e) => setZoom(parseFloat(e.target.value))}
+                      className="w-full"
+                    />
+                  </div>
+
+                  <p className="text-sm text-(--onyx-grey) mt-2">
+                    💡 Drag the image to reposition, use the slider to zoom
+                  </p>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleCancelCrop}
+                    className="flex-1 btn-secondary"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleCropImage}
+                    className="flex-1 btn-primary"
+                  >
+                    Apply Crop
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+      )}
+    </ProtectedRoute>
+  );
+}

@@ -6,7 +6,10 @@ import { motion } from 'framer-motion';
 import { ShoppingCart, House, Heart } from 'phosphor-react';
 import toast from 'react-hot-toast';
 import { useShop } from '@/context/ShopContext';
-import { Store, Product as StoreProduct } from '@/types';
+import { Store ,Product as StoreProduct, CartItem } from '@/types';
+import { TEMPLATES, TemplateConfig } from '@/app/dashboard/templateConfig';
+import { createTransaction, getShopOwner, sendTransaction } from '@/lib/shop_interaction';
+import { getIPFSUrl } from '@/lib/ipfs-upload';
 
 interface Product {
   id: string;
@@ -41,6 +44,7 @@ export default function PublishedStorePage() {
   const [storeData, setStoreData] = useState<StoreData | null>(null);
   const [store, setStore] = useState<Store | null>(null);
   const [storeProducts, setStoreProducts] = useState<StoreProduct[]>([]);
+  const [templateConfig, setTemplateConfig] = useState<TemplateConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<string>('home');
@@ -49,21 +53,53 @@ export default function PublishedStorePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+
+  // Load cart items from cache on mount
+  useEffect(() => {
+    if (storeName) {
+      const cacheKey = `cart_${storeName}`;
+      const cachedCart = localStorage.getItem(cacheKey);
+      if (cachedCart) {
+        try {
+          const parsedCart = JSON.parse(cachedCart);
+          setCartItems(parsedCart);
+          console.log('📦 Loaded cart from cache:', parsedCart);
+        } catch (error) {
+          console.error('❌ Error parsing cached cart:', error);
+          localStorage.removeItem(cacheKey);
+        }
+      }
+    }
+  }, [storeName]);
+
+  // Save cart items to cache whenever they change
+  useEffect(() => {
+    if (storeName && cartItems.length >= 0) {
+      const cacheKey = `cart_${storeName}`;
+      localStorage.setItem(cacheKey, JSON.stringify(cartItems));
+      console.log('💾 Saved cart to cache:', cartItems);
+    }
+  }, [cartItems, storeName]);
 
   useEffect(() => {
     const loadStore = async () => {
       setLoading(true);
-      try {
-        console.log('🏪 Loading storefront for:', storeName);
-        
+      try {        
         // First try to find in loaded stores
         let foundStore = stores.find(s => s.name.toLowerCase() === storeName.toLowerCase());
         
         // If not found, fetch from blockchain
         if (!foundStore) {
           console.log('📡 Store not in cache, fetching from blockchain...');
-          const fetchedStore = await getStoreByName(storeName);
+          const filteredStoreName = storeName.replaceAll('%20', ' ');
+          console.log(' Fetching store with name:', filteredStoreName);
+          const fetchedStore = await getStoreByName(filteredStoreName);
+          
+          console.log('📡 Fetched store from blockchain:', storeName);
+
           if (fetchedStore) {
+            console.log(' Store found on blockchain:', fetchedStore);
             foundStore = fetchedStore;
           }
         }
@@ -74,12 +110,18 @@ export default function PublishedStorePage() {
           return;
         }
 
-        console.log('✅ Store found:', foundStore);
+        console.log(' Store found:', foundStore);
         setStore(foundStore);
+
+        // Load template configuration based on templateId
+        const templateId = foundStore.templateId || 'minimal';
+        const template = TEMPLATES[templateId] || TEMPLATES.minimal;
+        console.log('🎨 Using template:', templateId, template);
+        setTemplateConfig(template);
 
         // Load products for this store
         const storeProds = await getProducts(foundStore.id);
-        console.log('📦 Store products:', storeProds);
+        console.log(' Store products:', storeProds);
         setStoreProducts(storeProds);
 
         // Convert to StoreData format for existing UI
@@ -87,32 +129,39 @@ export default function PublishedStorePage() {
         
         const convertedData: StoreData = {
           storeName: foundStore.name,
-          heroTitle: foundStore.name,
-          heroSubtitle: foundStore.description || 'Welcome to our store',
-          heroImage: '', // TODO: Add hero image support
+          heroTitle: foundStore.customization.heroTitle,
+          heroSubtitle: foundStore.customization.heroSubtitle,
+          heroImage: template.heroImage,
           products: storeProds.map(p => ({
             id: p.id,
             name: p.name,
             price: p.price,
-            image: p.images[0] || '',
+            image: p.images.length > 0 ? getIPFSUrl(p.images[0]) : 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop',
             category: p.metadata?.category || 'Uncategorized',
             description: p.description,
             badge: p.isPublished ? undefined : 'Draft',
           })),
           categories: ['All', ...categories],
-          primaryColor: foundStore.customization?.primaryColor || '#1a1a1a',
-          secondaryColor: foundStore.customization?.secondaryColor || '#d4af37',
-          accentColor: foundStore.customization?.primaryColor || '#1a1a1a',
-          textColor: '#1a1a1a',
-          aboutText: foundStore.description || '',
+          primaryColor: foundStore.customization.primaryColor || template.primaryColor,
+          secondaryColor: foundStore.customization.secondaryColor || template.secondaryColor,
+          accentColor: foundStore.customization.accentColor || template.accentColor,
+          textColor: foundStore.customization.textColor || template.textColor,
+          aboutText: foundStore.customization.aboutText || template.aboutText,
           contactEmail: 'contact@' + foundStore.name.toLowerCase().replace(/\s+/g, '') + '.com',
           publishedAt: foundStore.createdAt.toISOString(),
         };
 
+        console.log('🎨 Applied template colors:', {
+          primary: template.primaryColor,
+          secondary: template.secondaryColor,
+          accent: template.accentColor,
+          text: template.textColor,
+        });
+
         setStoreData(convertedData);
         setError(null);
       } catch (err: any) {
-        console.error('❌ Error loading store:', err);
+        console.error(' Error loading store:', err);
         setError('Failed to load store data: ' + err.message);
       } finally {
         setLoading(false);
@@ -173,7 +222,99 @@ export default function PublishedStorePage() {
         }
         return [...prev, { id: productId, quantity: 1 }];
       });
-      toast.success(`${product.name} added to cart!`);
+      toast.success(`${product.name} added to cart!`, {duration: 500});
+    }
+  };
+
+  const handleCheckout = async () => {
+    if (!store) {
+      toast.error('Store information not available');
+      return;
+    }
+
+    if (cartItems.length === 0) {
+      toast.error('Your cart is empty');
+      return;
+    }
+
+    setCheckoutLoading(true);
+    const toastId = toast.loading('Processing your order...');
+
+    try {
+      // Prepare arrays for all items in cart
+      const itemIds: string[] = [];
+      const quantities: number[] = [];
+      const prices: number[] = [];
+
+      let totalPriceInEth = 0;
+
+      for (const cartItem of cartItems) {
+        const product = storeProducts.find((p) => p.id === cartItem.id);
+        
+        if (!product) {
+          throw new Error(`Product ${cartItem.id} not found`);
+        }
+
+        // Calculate total price for this item in ETH
+        const _totalPriceInEth = product.price * cartItem.quantity;
+
+        console.log(`🛒 Adding to transaction: ${product.name}, Quantity: ${cartItem.quantity}, Total: ${_totalPriceInEth} ETH`);
+
+        itemIds.push(product.id);
+        quantities.push(cartItem.quantity);
+        prices.push(_totalPriceInEth);
+        totalPriceInEth += _totalPriceInEth;
+      }
+
+        const ownerAddress = await getShopOwner(store.name);
+
+        const txnResult = await sendTransaction(ownerAddress, totalPriceInEth);
+        console.log(' Transaction successful:', txnResult.txHash);
+
+      // Create transaction for all items at once
+      console.log(' Creating transaction for all items...');
+      const result = await createTransaction(
+        store.id, // Shop contract address
+        itemIds,
+        quantities,
+        prices,
+        txnResult.txHash
+      );
+
+      console.log(' Transaction successful:', result);
+
+      // Clear cart after successful checkout
+      setCartItems([]);
+      setCartOpen(false);
+      
+      // Clear cart from cache
+      const cacheKey = `cart_${storeName}`;
+      localStorage.removeItem(cacheKey);
+      console.log('🗑️ Cleared cart cache after successful checkout');
+      
+      toast.success('Order placed successfully! 🎉', { id: toastId });
+      toast.success('You will receive confirmation shortly');
+      
+    } catch (error: any) {
+      console.error(' Checkout error:', error);
+      
+      let errorMessage = 'Checkout failed. Please try again.';
+      
+      if (error.message) {
+        if (error.message.includes('rejected by user')) {
+          errorMessage = 'Transaction was cancelled';
+        } else if (error.message.includes('insufficient funds')) {
+          errorMessage = 'Insufficient funds for this purchase';
+        } else if (error.message.includes('Insufficient stock')) {
+          errorMessage = 'Some items are out of stock';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      toast.error(errorMessage, { id: toastId });
+    } finally {
+      setCheckoutLoading(false);
     }
   };
 
@@ -244,12 +385,13 @@ export default function PublishedStorePage() {
       <div
         className="absolute inset-0"
         style={{
-          background: 'linear-gradient(135deg, rgba(10, 14, 39, 0.75) 0%, rgba(26, 31, 58, 0.6) 100%)',
+          background: templateConfig?.heroGradient || 'linear-gradient(135deg, rgba(10, 14, 39, 0.75) 0%, rgba(26, 31, 58, 0.6) 100%)',
         }}
       />
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
         <motion.h2
-          className="text-5xl md:text-6xl font-bold mb-4 leading-tight text-white"
+          className="text-5xl md:text-6xl font-bold mb-4 leading-tight"
+          style={{ color: storeData.accentColor }}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
@@ -257,7 +399,8 @@ export default function PublishedStorePage() {
           {storeData.heroTitle}
         </motion.h2>
         <motion.p
-          className="text-lg md:text-xl mb-8 max-w-2xl font-light text-gray-300"
+          className="text-lg md:text-xl mb-8 max-w-2xl font-light"
+          style={{ color: storeData.accentColor, opacity: 0.9 }}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
@@ -290,7 +433,12 @@ export default function PublishedStorePage() {
           placeholder="Search products..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2"
+          style={{ 
+            borderColor: storeData.secondaryColor,
+            backgroundColor: storeData.primaryColor,
+            color: storeData.textColor
+          }}
         />
 
         <div className="flex gap-3 overflow-x-auto pb-2">
@@ -329,6 +477,19 @@ export default function PublishedStorePage() {
                 src={product.image}
                 alt={product.name}
                 className="w-full h-full object-cover hover:scale-110 transition-transform"
+                onError={(e) => {
+                  const img = e.target as HTMLImageElement;
+                  // If current image fails, try ipfs.io gateway
+                  if (!img.src.includes('ipfs.io')) {
+                    img.src = product.image.replace('gateway.pinata.cloud', 'ipfs.io');
+                  } else if (!img.src.includes('cloudflare-ipfs.com')) {
+                    // If ipfs.io fails, try Cloudflare
+                    img.src = product.image.replace('gateway.pinata.cloud', 'cloudflare-ipfs.com');
+                  } else {
+                    // If all gateways fail, use fallback
+                    img.src = 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+                  }
+                }}
               />
               {product.badge && (
                 <div
@@ -357,7 +518,7 @@ export default function PublishedStorePage() {
                   className="p-2 rounded-full text-white transition-all hover:scale-110"
                   style={{ backgroundColor: storeData.accentColor }}
                 >
-                  <ShoppingCart size={20} weight="fill" />
+                  <ShoppingCart size={48} weight="fill" className='p-2' />
                 </button>
               </div>
             </div>
@@ -376,10 +537,13 @@ export default function PublishedStorePage() {
   // About Section
   const AboutSection = () => (
     <div className="max-w-2xl mx-auto py-12">
-      <h2 className="text-4xl font-bold mb-6 text-gray-900">About {storeData.storeName}</h2>
-      <p className="text-lg text-gray-700 leading-relaxed">{storeData.aboutText}</p>
-      <div className="mt-8 p-6 bg-blue-50 rounded-lg border border-blue-200">
-        <p className="text-gray-900">
+      <h2 className="text-4xl font-bold mb-6" style={{ color: storeData.textColor }}>About {storeData.storeName}</h2>
+      <p className="text-lg leading-relaxed" style={{ color: storeData.textColor }}>{storeData.aboutText}</p>
+      <div className="mt-8 p-6 rounded-lg border" style={{ 
+        backgroundColor: storeData.secondaryColor,
+        borderColor: storeData.accentColor 
+      }}>
+        <p style={{ color: storeData.textColor }}>
           <strong>Contact:</strong> {storeData.contactEmail}
         </p>
       </div>
@@ -400,7 +564,7 @@ export default function PublishedStorePage() {
   };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: storeData.primaryColor }}>
+    <div className="min-h-screen" style={{ backgroundColor: templateConfig?.backgroundColor || storeData.primaryColor }}>
       <Navbar />
 
       <div className="max-w-7xl mx-auto px-6 py-8">
@@ -415,7 +579,7 @@ export default function PublishedStorePage() {
           backgroundColor: storeData.secondaryColor,
         }}
       >
-        <div className="max-w-7xl mx-auto px-6 text-center text-gray-600">
+        <div className="max-w-7xl mx-auto px-6 text-center" style={{ color: storeData.textColor }}>
           <p>© 2025 {storeData.storeName}. All rights reserved.</p>
           <p className="text-sm mt-2">Powered by Onyx Shop</p>
         </div>
@@ -439,6 +603,16 @@ export default function PublishedStorePage() {
                   src={selectedProduct.image}
                   alt={selectedProduct.name}
                   className="w-full rounded-lg"
+                  onError={(e) => {
+                    const img = e.target as HTMLImageElement;
+                    if (!img.src.includes('ipfs.io')) {
+                      img.src = selectedProduct.image.replace('gateway.pinata.cloud', 'ipfs.io');
+                    } else if (!img.src.includes('cloudflare-ipfs.com')) {
+                      img.src = selectedProduct.image.replace('gateway.pinata.cloud', 'cloudflare-ipfs.com');
+                    } else {
+                      img.src = 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+                    }
+                  }}
                 />
               </div>
               <div>
@@ -503,12 +677,68 @@ export default function PublishedStorePage() {
                       src={product?.image}
                       alt={product?.name}
                       className="w-20 h-20 rounded object-cover"
+                      onError={(e) => {
+                        const img = e.target as HTMLImageElement;
+                        if (product?.image) {
+                          if (!img.src.includes('ipfs.io')) {
+                            img.src = product.image.replace('gateway.pinata.cloud', 'ipfs.io');
+                          } else if (!img.src.includes('cloudflare-ipfs.com')) {
+                            img.src = product.image.replace('gateway.pinata.cloud', 'cloudflare-ipfs.com');
+                          } else {
+                            img.src = 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+                          }
+                        }
+                      }}
                     />
                     <div className="flex-1">
                       <h3 className="font-semibold">{product?.name}</h3>
                       <p className="text-sm text-gray-600">
                         ${product?.price.toFixed(2)} × {item.quantity}
                       </p>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setCartItems((prev) =>
+                                prev.map((i) =>
+                                  i.id === item.id && i.quantity > 1
+                                    ? { ...i, quantity: i.quantity - 1 }
+                                    : i
+                                )
+                              );
+                            }}
+                            className="w-8 h-8 rounded-full border-2 flex items-center justify-center font-bold hover:bg-gray-100 transition-colors"
+                            style={{ borderColor: storeData.accentColor, color: storeData.accentColor }}
+                          >
+                            −
+                          </button>
+                          <span className="w-8 text-center font-semibold">{item.quantity}</span>
+                          <button
+                            onClick={() => {
+                              setCartItems((prev) =>
+                                prev.map((i) =>
+                                  i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+                                )
+                              );
+                            }}
+                            className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white hover:opacity-90 transition-opacity"
+                            style={{ backgroundColor: storeData.accentColor }}
+                          >
+                            +
+                          </button>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setCartItems((prev) => prev.filter((i) => i.id !== item.id));
+                            toast.success('Item removed from cart');
+                          }}
+                          className="text-xs text-red-500 hover:text-red-700 transition-colors"
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -525,10 +755,26 @@ export default function PublishedStorePage() {
                   </span>
                 </div>
                 <button
-                  className="w-full px-6 py-3 text-white font-semibold rounded-lg transition-all hover:shadow-lg"
+                  className="w-full px-6 py-3 text-black font-semibold rounded-lg transition-all hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   style={{ backgroundColor: storeData.accentColor }}
+                  onClick={handleCheckout}
+                  disabled={checkoutLoading}
                 >
-                  Checkout
+                  {checkoutLoading ? (
+                    <>
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                        className="w-5 h-5 border-2 border-black border-t-transparent rounded-full"
+                      />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart size={20} weight="fill" />
+                      Checkout
+                    </>
+                  )}
                 </button>
               </div>
             </div>
