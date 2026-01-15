@@ -21,7 +21,7 @@
 </p>
 </div>
 
-### 📌 Submitted for Mantle Global Hackathon 2025
+### 📌 Submitted for Mantle Global Hackathon 2026
 Onyx is a decentralized, **no-code e-commerce builder** that allows anyone regardless of technical background—to launch a fully functional, self-owned storefront on the blockchain. By leveraging the Mantle Network, Onyx provides a high-speed, low-gas alternative to traditional Web2 platforms.
 
 ## Live Demos & Deliverables
@@ -31,7 +31,7 @@ Onyx is a decentralized, **no-code e-commerce builder** that allows anyone regar
 </a>
 
 - **Live dApp:** [Launch Onyx](https://onyx-iota-five.vercel.app/)
-- **Pitch Deck:** [View Presentation](YOUR_SLIDES_LINK)
+- **Pitch Deck:** [View Presentation](https://youtu.be/QMPTGZmbLe0)
 
 ---
 
@@ -137,7 +137,7 @@ Before running the project locally, ensure you have the following installed:
 
 ### 1. Clone the Repository
 ```bash
-git clone [https://github.com/Pushpender-18/Onyx.git](https://github.com/Pushpender-18/Onyx.git)
+git clone [https://github.com/Pushpender-18/Onyx.git]
 
 cd Onyx
 ```
