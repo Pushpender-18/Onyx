@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Wallet, WarningCircle } from 'phosphor-react';
-import { isWalletConnected, connectWallet } from '@/lib/shop_interaction';
+// import { isWalletConnected, connectWallet } from '@/lib/shop_interaction';
 
 export function WalletStatus() {
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
@@ -34,31 +34,31 @@ export function WalletStatus() {
   }, []);
 
   const checkConnection = async () => {
-    const connected = await isWalletConnected();
-    setIsConnected(connected);
+    // const connected = await isWalletConnected();
+    // setIsConnected(connected);
     
-    if (connected && typeof window !== 'undefined' && (window as any).ethereum) {
-      try {
-        const accounts = await (window as any).ethereum.request({ 
-          method: 'eth_accounts' 
-        });
-        if (accounts && accounts.length > 0) {
-          setAddress(accounts[0]);
-        }
-      } catch (error) {
-        console.error('Error getting accounts:', error);
-      }
-    }
+    // if (connected && typeof window !== 'undefined' && (window as any).ethereum) {
+    //   try {
+    //     const accounts = await (window as any).ethereum.request({ 
+    //       method: 'eth_accounts' 
+    //     });
+    //     if (accounts && accounts.length > 0) {
+    //       setAddress(accounts[0]);
+    //     }
+    //   } catch (error) {
+    //     console.error('Error getting accounts:', error);
+    //   }
+    // }
   };
 
   const handleConnect = async () => {
     setIsConnecting(true);
-    const success = await connectWallet();
+    // const success = await connectWallet();
     setIsConnecting(false);
     
-    if (success) {
-      await checkConnection();
-    }
+    // if (success) {
+    //   await checkConnection();
+    // }
   };
 
   const formatAddress = (addr: string) => {
