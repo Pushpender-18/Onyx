@@ -103,9 +103,20 @@ In 2 minutes, Sarah has a live, decentralized storefront where customers can buy
 | UI Customization       | ![In Progress](https://img.shields.io/badge/status-polishing-yellow)   |
 | Multi-token Support    | ![Coming Soon](https://img.shields.io/badge/status-coming--soon-yellow)|
 
+> ⚠️ *Project is still buggy but fully hosted and demo-ready.*
 ---
+## <img src = "https://user-images.githubusercontent.com/74038190/212284087-bbe7e430-757e-4901-90bf-4cd2ce3e1852.gif" width = "24"/> Run Locally
 
-## 🚀 Run Locally
+###  Prerequisites
+
+Before running the project locally, ensure you have the following installed:
+
+- [Node.js (>=18.x)](https://nodejs.org/)  
+- [npm](https://www.npmjs.com/) or [pnpm](https://yarnpkg.com/](https://pnpm.io/installation))  
+- [Truffle](https://www.rust-lang.org/tools/install](https://archive.trufflesuite.com/docs/truffle/how-to/install/)) or [Hardhat](https://v2.hardhat.org/hardhat-runner/docs/getting-started#installation)   
+- [Pinata IPFS](https://pinata.cloud/)
+- [Git](https://git-scm.com/)
+
 
 ### 1. Clone the Repository
 ```bash
