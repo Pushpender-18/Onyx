@@ -1,5 +1,6 @@
 <div align="center">
-  <img width="200" alt="Onyx Logo" src="https://github.com/user-attachments/assets/your-logo-link-here" />
+  <img width="100" height="100" alt="Gemini_Generated_Image_l3fdjzl3fdjzl3fd" src="https://github.com/user-attachments/assets/cc28df10-4690-417c-913f-ff0a61178f19" />
+
   <p>Independent E-Commerce made easy. Powered by <b>Mantle</b></p>
 
 <br/>
@@ -21,7 +22,7 @@
 </div>
 
 ### 📌 Submitted for Mantle Global Hackathon 2025
-Onyx is a decentralized, **no-code e-commerce builder** that allows anyone—regardless of technical background—to launch a fully functional, self-owned storefront on the blockchain. By leveraging the Mantle Network, Onyx provides a high-speed, low-gas alternative to traditional Web2 platforms.
+Onyx is a decentralized, **no-code e-commerce builder** that allows anyone regardless of technical background—to launch a fully functional, self-owned storefront on the blockchain. By leveraging the Mantle Network, Onyx provides a high-speed, low-gas alternative to traditional Web2 platforms.
 
 ## Live Demos & Deliverables
 - **Demo Video:** [Watch on YouTube](YOUR_YOUTUBE_LINK)
@@ -97,8 +98,8 @@ In 2 minutes, Sarah has a live, decentralized storefront where customers can buy
 
 | Feature                | Status                                                                  |
 |------------------------|-------------------------------------------------------------------------|
-| Store Deployment (Mantle)| ![Working](https://img.shields.io/badge/status-working-brightgreen)    |
-| IPFS Image Uploads     | ![Working](https://img.shields.io/badge/status-working-brightgreen)    |
+| Store Deployment (Mantle)| ![Ready](https://img.shields.io/badge/status-ready-brightgreen)    |
+| IPFS Image Uploads     | ![Ready](https://img.shields.io/badge/status-ready-brightgreen)    |
 | UI Customization       | ![In Progress](https://img.shields.io/badge/status-polishing-yellow)   |
 | Multi-token Support    | ![Coming Soon](https://img.shields.io/badge/status-coming--soon-yellow)|
 
