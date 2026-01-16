@@ -12,7 +12,6 @@ import { createTransaction, getShopOwner, sendTransaction } from '@/lib/shop_int
 import { getIPFSUrl } from '@/lib/ipfs-upload';
 import { ethers } from 'ethers';
 import { useWeb3Auth, useWeb3AuthConnect } from '@web3auth/modal/react';
-import { Web3Auth } from '@web3auth/modal';
 
 interface Product {
   id: string;
@@ -58,10 +57,11 @@ export default function PublishedStorePage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const { provider } = useWeb3Auth();
-  const { isConnected } = useWeb3AuthConnect();
+  const { isConnected, connect } = useWeb3AuthConnect();
   const [tries, setTries] = useState(0);
   // Load cart items from cache on mount
   useEffect(() => {
+
     console.log("Provider: ", provider);
     if ((tries < 5) && (isConnected)) {
       setTries(tries + 1);
@@ -103,104 +103,131 @@ export default function PublishedStorePage() {
   }, [cartItems, storeName]);
 
   useEffect(() => {
-    if (!isConnected) {
-      console.log('Wallet not connected yet');
-      return;
-    }
-
     if (!provider) {
       console.log('Provider not available yet');
       return;
     }
 
-    const loadStore = async () => {
-      console.log("Is connected: ", isConnected);
-      setLoading(true);
-      try {
-        // First try to find in loaded stores
-        let foundStore = stores.find(s => s.name.toLowerCase() === storeName.toLowerCase());
+    if (isConnected) {
 
-        // If not found, fetch from blockchain
-        if (!foundStore) {
-          console.log('📡 Store not in cache, fetching from blockchain...');
-          const filteredStoreName = storeName.replaceAll('%20', ' ');
-          console.log(' Fetching store with name:', filteredStoreName);
-          const fetchedStore = await getStoreByName(filteredStoreName, signer);
+      const loadStore = async () => {
+        console.log("Is connected: ", isConnected);
+        setLoading(true);
+        try {
+          // First try to find in loaded stores
+          let foundStore = stores.find(s => s.name.toLowerCase() === storeName.toLowerCase());
 
-          console.log('📡 Fetched store from blockchain:', storeName);
+          // If not found, fetch from blockchain
+          if (!foundStore) {
+            console.log('📡 Store not in cache, fetching from blockchain...');
+            const filteredStoreName = storeName.replaceAll('%20', ' ');
+            console.log(' Fetching store with name:', filteredStoreName);
+            const fetchedStore = await getStoreByName(filteredStoreName, signer);
 
-          if (fetchedStore) {
-            console.log(' Store found on blockchain:', fetchedStore);
-            foundStore = fetchedStore;
+            console.log('📡 Fetched store from blockchain:', storeName);
+
+            if (fetchedStore) {
+              console.log(' Store found on blockchain:', fetchedStore);
+              foundStore = fetchedStore;
+            }
           }
-        }
 
-        if (!foundStore) {
-          setError('Store not found. It may not have been published yet.');
+          if (!foundStore) {
+            setError('Store not found. It may not have been published yet.');
+            setLoading(false);
+            return;
+          }
+
+          console.log(' Store found:', foundStore);
+          setStore(foundStore);
+
+          // Load template configuration based on templateId
+          const templateId = foundStore.templateId || 'minimal';
+          const template = TEMPLATES[templateId] || TEMPLATES.minimal;
+          console.log('🎨 Using template:', templateId, template);
+          setTemplateConfig(template);
+
+          // Load products for this store
+          const storeProds = await getProducts(foundStore.id, signer);
+          console.log(' Store products:', storeProds);
+          setStoreProducts(storeProds);
+
+          // Convert to StoreData format for existing UI
+          const categories = [...new Set(storeProds.map(p => p.metadata?.category || 'Uncategorized'))];
+
+          const convertedData: StoreData = {
+            storeName: foundStore.name,
+            heroTitle: foundStore.customization.heroTitle,
+            heroSubtitle: foundStore.customization.heroSubtitle,
+            heroImage: template.heroImage,
+            products: storeProds.map(p => ({
+              id: p.id,
+              name: p.name,
+              price: p.price,
+              image: p.images.length > 0 ? getIPFSUrl(p.images[0]) : 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop',
+              category: p.metadata?.category || 'Uncategorized',
+              description: p.description,
+              badge: p.isPublished ? undefined : 'Draft',
+            })),
+            categories: ['All', ...categories],
+            primaryColor: foundStore.customization.primaryColor || template.primaryColor,
+            secondaryColor: foundStore.customization.secondaryColor || template.secondaryColor,
+            accentColor: foundStore.customization.accentColor || template.accentColor,
+            textColor: foundStore.customization.textColor || template.textColor,
+            aboutText: foundStore.customization.aboutText || template.aboutText,
+            contactEmail: 'contact@' + foundStore.name.toLowerCase().replace(/\s+/g, '') + '.com',
+            publishedAt: foundStore.createdAt.toISOString(),
+          };
+
+          console.log('🎨 Applied template colors:', {
+            primary: template.primaryColor,
+            secondary: template.secondaryColor,
+            accent: template.accentColor,
+            text: template.textColor,
+          });
+
+          setStoreData(convertedData);
+          setError(null);
+        } catch (err: any) {
+          console.error(' Error loading store:', err);
+          setError('Failed to load store data: ' + err.message);
+        } finally {
           setLoading(false);
-          return;
         }
+      };
 
-        console.log(' Store found:', foundStore);
-        setStore(foundStore);
+      loadStore();
+    }
 
-        // Load template configuration based on templateId
-        const templateId = foundStore.templateId || 'minimal';
-        const template = TEMPLATES[templateId] || TEMPLATES.minimal;
-        console.log('🎨 Using template:', templateId, template);
-        setTemplateConfig(template);
-
-        // Load products for this store
-        const storeProds = await getProducts(foundStore.id, signer);
-        console.log(' Store products:', storeProds);
-        setStoreProducts(storeProds);
-
-        // Convert to StoreData format for existing UI
-        const categories = [...new Set(storeProds.map(p => p.metadata?.category || 'Uncategorized'))];
-
-        const convertedData: StoreData = {
-          storeName: foundStore.name,
-          heroTitle: foundStore.customization.heroTitle,
-          heroSubtitle: foundStore.customization.heroSubtitle,
-          heroImage: template.heroImage,
-          products: storeProds.map(p => ({
-            id: p.id,
-            name: p.name,
-            price: p.price,
-            image: p.images.length > 0 ? getIPFSUrl(p.images[0]) : 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop',
-            category: p.metadata?.category || 'Uncategorized',
-            description: p.description,
-            badge: p.isPublished ? undefined : 'Draft',
-          })),
-          categories: ['All', ...categories],
-          primaryColor: foundStore.customization.primaryColor || template.primaryColor,
-          secondaryColor: foundStore.customization.secondaryColor || template.secondaryColor,
-          accentColor: foundStore.customization.accentColor || template.accentColor,
-          textColor: foundStore.customization.textColor || template.textColor,
-          aboutText: foundStore.customization.aboutText || template.aboutText,
-          contactEmail: 'contact@' + foundStore.name.toLowerCase().replace(/\s+/g, '') + '.com',
-          publishedAt: foundStore.createdAt.toISOString(),
-        };
-
-        console.log('🎨 Applied template colors:', {
-          primary: template.primaryColor,
-          secondary: template.secondaryColor,
-          accent: template.accentColor,
-          text: template.textColor,
-        });
-
-        setStoreData(convertedData);
-        setError(null);
-      } catch (err: any) {
-        console.error(' Error loading store:', err);
-        setError('Failed to load store data: ' + err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadStore();
   }, [storeName, signer]);
+
+  if (!isConnected) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full mx-4 text-center">
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", duration: 0.5 }}
+            className="text-6xl mb-4"
+          >
+            🔐
+          </motion.div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Login Required</h1>
+          <p className="text-gray-600 mb-6">
+            Please connect your wallet to view this store and start shopping.
+          </p>
+          <button
+            onClick={() => connect()}
+            className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-md hover:shadow-lg"
+          >
+            Connect Wallet
+          </button>
+        </div>
+      </div>
+    );
+
+  }
 
   if (loading) {
     return (
