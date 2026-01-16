@@ -414,7 +414,6 @@ export default function AddProductPage() {
                     Price <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-(--onyx-grey)">$</span>
                     <input
                       type="number"
                       step="0.01"
@@ -422,9 +421,10 @@ export default function AddProductPage() {
                       value={productData.price}
                       onChange={(e) => handleInputChange('price', e.target.value)}
                       placeholder="0.00"
-                      className="input-field pl-8"
+                      className="input-field"
                       required
                     />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-(--onyx-grey)">MNT</span>
                   </div>
                 </div>
 

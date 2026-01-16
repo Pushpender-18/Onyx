@@ -184,7 +184,7 @@ export default function Dashboard() {
               },
               {
                 label: 'Total Sales',
-                value: `$${totalSalesByOwner?.totalSalesInEth || 0}`,
+                value: `${totalSalesByOwner?.totalSalesInEth || 0} MNT`,
                 icon: TrendUp,
               },
             ].map((stat, index) => (

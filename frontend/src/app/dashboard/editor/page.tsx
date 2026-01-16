@@ -242,7 +242,7 @@ export default function StoreEditor() {
 
     // Navigate to the Add Product page with store info
     const currentUrl = window.location.pathname + window.location.search;
-    router.push(`/dashboard/products/add?storeId=${currentStore.id}&storeName=${encodeURIComponent(currentStore.name)}&returnUrl=${encodeURIComponent(currentUrl)}`);
+    router.push(`/dashboard/products/add?storeId=MNT{currentStore.id}&storeName=MNT{encodeURIComponent(currentStore.name)}&returnUrl=${encodeURIComponent(currentUrl)}`);
   };
 
   // Publish handler
@@ -643,7 +643,7 @@ export default function StoreEditor() {
                         className="text-2xl font-bold"
                         style={{ color: storeData.accentColor }}
                       >
-                        ${product.price.toFixed(2)}
+                        {product.price.toFixed(2)} MNT
                       </span>
                       <button
                         className="px-4 py-2 rounded-lg font-semibold text-sm transition-all hover:shadow-lg"
@@ -735,7 +735,7 @@ export default function StoreEditor() {
                     className="text-5xl font-bold"
                     style={{ color: storeData.accentColor }}
                   >
-                    ${selectedProduct.price.toFixed(2)}
+                    {selectedProduct.price.toFixed(2)} MNT
                   </span>
                   <span style={{ color: '#a0aec0' }}>USD</span>
                 </div>
@@ -981,7 +981,7 @@ export default function StoreEditor() {
                         />
                         <div className="flex-1">
                           <h3 className="text-lg font-bold" style={{ color: '#cbd5e1' }}>{item.name}</h3>
-                          <p style={{ color: '#a0aec0' }}>${item.price.toFixed(2)}</p>
+                          <p style={{ color: '#a0aec0' }}>{item.price.toFixed(2)} MNT</p>
                           <div className="flex items-center gap-4 mt-4">
                             <span className="text-sm" style={{ color: '#a0aec0' }}>Qty: {item.quantity}</span>
                             <button
@@ -994,7 +994,7 @@ export default function StoreEditor() {
                         </div>
                         <div className="text-right">
                           <p className="text-xl font-bold" style={{ color: storeData.accentColor }}>
-                            ${(item.price * item.quantity).toFixed(2)}
+                            {(item.price * item.quantity).toFixed(2)} MNT
                           </p>
                         </div>
                       </div>
@@ -1009,15 +1009,15 @@ export default function StoreEditor() {
                 <div className="space-y-4 mb-6" style={{ color: '#a0aec0' }}>
                   <div className="flex justify-between">
                     <span>Subtotal</span>
-                    <span>${total.toFixed(2)}</span>
+                    <span>{total.toFixed(2)} MNT</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Shipping</span>
-                    <span>$10.00</span>
+                    <span>10.00 MNT</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Tax</span>
-                    <span>${(total * 0.1).toFixed(2)}</span>
+                    <span>{(total * 0.1).toFixed(2)} MNT</span>
                   </div>
                 </div>
                 <div
@@ -1025,7 +1025,7 @@ export default function StoreEditor() {
                   style={{ borderColor: '#2d3748', color: storeData.accentColor }}
                 >
                   <span>Total</span>
-                  <span>${(total + 10 + total * 0.1).toFixed(2)}</span>
+                  <span>{(total + 10 + total * 0.1).toFixed(2)} MNT </span>
                 </div>
                 <button
                   onClick={() => setCurrentPage('checkout')}
@@ -1218,29 +1218,29 @@ export default function StoreEditor() {
                 {cartProducts.map((item) => (
                   <div key={item.id} className="flex justify-between text-sm">
                     <span>{item.name} x{item.quantity}</span>
-                    <span>${(item.price * item.quantity).toFixed(2)}</span>
+                    <span>{(item.price * item.quantity).toFixed(2)} MNT</span>
                   </div>
                 ))}
               </div>
               <div className="space-y-2 pt-6" style={{ borderTop: `1px solid #2d3748`, color: '#a0aec0' }}>
                 <div className="flex justify-between">
                   <span>Subtotal</span>
-                  <span>${total.toFixed(2)}</span>
+                  <span>{total.toFixed(2)} MNT</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Shipping</span>
-                  <span>$10.00</span>
+                  <span>10.00 MNT</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Tax</span>
-                  <span>${(total * 0.1).toFixed(2)}</span>
+                  <span>{(total * 0.1).toFixed(2)} MNT</span>
                 </div>
                 <div
                   className="flex justify-between text-lg font-bold pt-4"
-                  style={{ borderTop: `2px solid ${storeData.accentColor}`, color: storeData.accentColor }}
+                  style={{ borderTop: `2px solid MNT{storeData.accentColor}`, color: storeData.accentColor }}
                 >
                   <span>Total</span>
-                  <span>${(total + 10 + total * 0.1).toFixed(2)}</span>
+                  <span>{(total + 10 + total * 0.1).toFixed(2)} MNT</span>
                 </div>
               </div>
             </div>
@@ -1455,7 +1455,7 @@ export default function StoreEditor() {
                   setImageUploadMode('upload');
                   setUploadedImage(null);
                 }}
-                className={`px-4 py-2 rounded-lg font-semibold transition-all ${imageUploadMode === 'upload'
+                className={`px-4 py-2 rounded-lg font-semibold transition-all MNT{imageUploadMode === 'upload'
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
@@ -1465,7 +1465,7 @@ export default function StoreEditor() {
               </button>
               <button
                 onClick={() => setImageUploadMode('url')}
-                className={`px-4 py-2 rounded-lg font-semibold transition-all ${imageUploadMode === 'url'
+                className={`px-4 py-2 rounded-lg font-semibold transition-all MNT{imageUploadMode === 'url'
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
@@ -2032,7 +2032,7 @@ export default function StoreEditor() {
                         <h4 className="text-sm font-semibold text-gray-900 truncate">
                           {product.name}
                         </h4>
-                        <p className="text-xs text-gray-500">${product.price.toFixed(2)}</p>
+                        <p className="text-xs text-gray-500">{product.price.toFixed(2)} MNT</p>
                         <span className="text-xs text-gray-600">{productCategory}</span>
                       </div>
                       <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">

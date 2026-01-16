@@ -332,7 +332,7 @@ export default function StoreDetailsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-lg font-bold text-(--onyx-dark)">
-                      {product.price} ETH
+                      {product.price} MNT
                     </p>
                     <p className="text-xs text-(--onyx-grey)">
                       {product.metadata?.category || 'Uncategorized'}

@@ -566,7 +566,7 @@ export default function PublishedStorePage() {
                   className="text-2xl font-bold"
                   style={{ color: storeData.accentColor }}
                 >
-                  ${product.price.toFixed(2)}
+                  {product.price.toFixed(2)} MNT
                 </span>
                 <button
                   onClick={(e) => {
@@ -682,7 +682,7 @@ export default function PublishedStorePage() {
                   className="text-4xl font-bold mb-6"
                   style={{ color: storeData.accentColor }}
                 >
-                  ${selectedProduct.price.toFixed(2)}
+                  {selectedProduct.price.toFixed(2)} MNT
                 </div>
                 <button
                   onClick={() => {
@@ -751,7 +751,7 @@ export default function PublishedStorePage() {
                     <div className="flex-1">
                       <h3 className="font-semibold">{product?.name}</h3>
                       <p className="text-sm text-gray-600">
-                        ${product?.price.toFixed(2)} × {item.quantity}
+                        {product?.price.toFixed(2)} MNT × {item.quantity}
                       </p>
                     </div>
                     <div className="flex-1">
@@ -809,7 +809,7 @@ export default function PublishedStorePage() {
                     className="text-2xl font-bold"
                     style={{ color: storeData.accentColor }}
                   >
-                    ${cartTotal.toFixed(2)}
+                    {cartTotal.toFixed(2)} MNT
                   </span>
                 </div>
                 <button
