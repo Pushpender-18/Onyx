@@ -265,8 +265,9 @@ export default function StoreEditor() {
       // Call blockchain function to publish the shop
       const isPublished = await isShopPublished(currentStore.id, signer);
       
+      const higherSigner = await signer.getSigner();
       if (!isPublished) {
-        const result = await publishShop(currentStore.id, signer);
+        const result = await publishShop(currentStore.id, higherSigner);
       }
 
       // Save UI customization data to localStorage for quick access
@@ -297,7 +298,7 @@ export default function StoreEditor() {
       console.log(storeName);
       // Update configuration on blockchain
       console.log('🔧 Updating shop configuration...');
-      const configUpdated = await updateConfiguration(storeName, currentStore.id, uiCustomizationString, finalStoreName, signer);
+      const configUpdated = await updateConfiguration(storeName, currentStore.id, uiCustomizationString, finalStoreName, higherSigner);
 
       if (!configUpdated) {
         throw new Error('Failed to update shop configuration');

@@ -242,6 +242,7 @@ export default function EditProductPage() {
       
       // Update toast to show MetaMask is needed
       toast.loading('Please confirm transaction in MetaMask...', { id: loadingToast });
+      const signerHiger = await signer.getSigner();
       
       const updatedProduct = await updateProductOnBlockchain(storeId, {
         ...currentProduct,
@@ -254,7 +255,7 @@ export default function EditProductPage() {
           category: productData.category,
           tags: currentProduct.metadata?.tags || [],
         },
-      }, signer);
+      }, signerHiger);
 
       if (updatedProduct) {
         toast.success('Product updated successfully!', { id: loadingToast });
