@@ -252,7 +252,7 @@ export default function AddProductPage() {
       let imageHash = '';
       if (productData.image) {
         toast.loading('Uploading image to IPFS...', { id: loadingToast });
-        console.log('📤 Uploading product image to IPFS...');
+        console.log(' Uploading product image to IPFS...');
         
         const ipfsResult = await uploadImageToIPFS(productData.image);
         

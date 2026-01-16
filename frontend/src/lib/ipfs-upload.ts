@@ -57,7 +57,7 @@ const IPFS_CONFIG = {
  */
 export async function uploadImageToIPFS(imageData: string | File): Promise<IPFSUploadResult> {
   try {
-    console.log('📤 Uploading image to IPFS...');
+    console.log(' Uploading image to IPFS...');
     console.log('🔧 Using provider:', IPFS_CONFIG.provider);
     console.log(' Config details:', {
       provider: IPFS_CONFIG.provider,
@@ -145,7 +145,7 @@ async function uploadToPinata(imageData: string | File): Promise<IPFSUploadResul
       ? await fetch(imageData).then(r => r.blob())
       : imageData;
     
-    console.log('📤 Blob created, size:', blob.size, 'bytes');
+    console.log(' Blob created, size:', blob.size, 'bytes');
     
     const formData = new FormData();
     formData.append('file', blob);
@@ -277,40 +277,34 @@ async function uploadToLocalNode(imageData: string | File): Promise<IPFSUploadRe
  */
 export function getIPFSUrl(ipfsHash: string): string {
   // Handle empty or invalid hash
-  // if (!ipfsHash || typeof ipfsHash !== 'string') {
-  //   console.warn(' Invalid IPFS hash provided:', ipfsHash);
-  //   return 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
-  // }
+  if (!ipfsHash || typeof ipfsHash !== 'string') {
+    console.warn('⚠️ Invalid IPFS hash provided:', ipfsHash);
+    return 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+  }
 
-  // // Remove any ipfs:// protocol prefix if present
-  // const cleanHash = ipfsHash.trim().replace(/^ipfs:\/\//, '');
+  // Remove any ipfs:// protocol prefix if present
+  const cleanHash = ipfsHash.trim().replace(/^ipfs:\/\//, '');
   
-  // console.log(' Processing IPFS hash:', { original: ipfsHash, cleaned: cleanHash });
+  console.log('📋 Processing IPFS hash:', { original: ipfsHash, cleaned: cleanHash });
 
-  // // Validate that it looks like a valid hash
-  // // Accepts: CIDv0 (Qm followed by chars) or CIDv1 (bafy or z prefix) or any alphanumeric that looks like a hash
-  // const isValidHash = cleanHash.match(/^(Qm[a-zA-Z0-9]+|bafy[a-zA-Z0-9]+|z[a-zA-Z0-9]+|[a-zA-Z0-9]{46,})$/);
+  // Validate that it looks like a valid hash
+  // Accepts: CIDv0 (Qm followed by chars) or CIDv1 (bafy or z prefix) or placeholder hashes
+  const isValidHash = cleanHash.match(/^(Qm[a-zA-Z0-9]+|bafy[a-zA-Z0-9]+|z[a-zA-Z0-9]+|[a-zA-Z0-9]{46,})$/);
   
-  // if (!isValidHash) {
-  //   console.warn(' Invalid IPFS hash format:', cleanHash, 'length:', cleanHash.length);
-  //   return 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
-  // }
+  if (!isValidHash) {
+    console.warn('⚠️ Invalid IPFS hash format:', cleanHash, 'length:', cleanHash.length);
+    return 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+  }
 
-  // console.log(' Valid IPFS hash detected:', cleanHash);
+  console.log('✅ Valid IPFS hash detected:', cleanHash);
 
-  // // Use Pinata gateway as primary (since we upload via Pinata)
-  // // Fallback to ipfs.io if Pinata has issues
-  // const gateways = [
-  //   `https://gateway.pinata.cloud/ipfs/${cleanHash}`,  // Primary - Pinata
-  //   `https://ipfs.io/ipfs/${cleanHash}`,                 // Fallback - Public gateway
-  //   `https://cloudflare-ipfs.com/ipfs/${cleanHash}`,    // Fallback - Cloudflare
-  // ];
+  // Use IPFS gateway that supports CORS and is reliable
+  // dweb.link has better CORS support than gateway.pinata.cloud
+  const primaryGateway = `https://dweb.link/ipfs/${cleanHash}`;
   
-  // // Return primary gateway
-  // console.log('📍 IPFS URL:', gateways[0]);
+  console.log('📍 IPFS URL:', primaryGateway);
   
-  // return gateways[0];
-  return "";
+  return primaryGateway;
 }
 
 /**
@@ -321,7 +315,7 @@ export function getIPFSUrl(ipfsHash: string): string {
 export async function uploadMultipleImagesToIPFS(
   images: (string | File)[]
 ): Promise<IPFSUploadResult[]> {
-  console.log(`📤 Uploading ${images.length} images to IPFS...`);
+  console.log(` Uploading ${images.length} images to IPFS...`);
   
   const uploadPromises = images.map(image => uploadImageToIPFS(image));
   const results = await Promise.all(uploadPromises);
@@ -347,11 +341,12 @@ export function getIPFSGatewayUrls(ipfsHash: string): string[] {
   // Remove any ipfs:// protocol prefix if present
   const cleanHash = ipfsHash.trim().replace(/^ipfs:\/\//, '');
   
-  // Return multiple gateway options
+  // Return multiple gateway options ordered by CORS reliability
   return [
-    `https://gateway.pinata.cloud/ipfs/${cleanHash}`,  // Primary - Pinata
+    `https://dweb.link/ipfs/${cleanHash}`,               // Primary - IPFS DNSLink gateway (best CORS support)
     `https://ipfs.io/ipfs/${cleanHash}`,                 // Fallback - Public gateway
+    `https://nft.storage/ipfs/${cleanHash}`,             // Fallback - NFT Storage gateway
+    `https://gateway.pinata.cloud/ipfs/${cleanHash}`,    // Fallback - Pinata (may have CORS issues)
     `https://cloudflare-ipfs.com/ipfs/${cleanHash}`,    // Fallback - Cloudflare
-    `https://dweb.link/ipfs/${cleanHash}`,               // Fallback - IPFS DNSLink gateway
   ];
 }

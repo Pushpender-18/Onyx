@@ -9,7 +9,7 @@ import { useShop } from '@/context/ShopContext';
 import { Store, Product as StoreProduct, CartItem } from '@/types';
 import { TEMPLATES, TemplateConfig } from '@/app/dashboard/templateConfig';
 import { createTransaction, getShopOwner, sendTransaction } from '@/lib/shop_interaction';
-import { getIPFSUrl } from '@/lib/ipfs-upload';
+import { getIPFSUrl, getIPFSGatewayUrls } from '@/lib/ipfs-upload';
 import { ethers } from 'ethers';
 import { useWeb3Auth, useWeb3AuthConnect } from '@web3auth/modal/react';
 
@@ -59,6 +59,7 @@ export default function PublishedStorePage() {
   const { provider } = useWeb3Auth();
   const { isConnected, connect } = useWeb3AuthConnect();
   const [tries, setTries] = useState(0);
+  const [gatewayIndices, setGatewayIndices] = useState<Record<string, number>>({});
   // Load cart items from cache on mount
   useEffect(() => {
 
@@ -203,7 +204,7 @@ export default function PublishedStorePage() {
 
   if (!isConnected) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-blue-50 to-indigo-100">
         <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full mx-4 text-center">
           <motion.div
             initial={{ scale: 0 }}
@@ -537,14 +538,25 @@ export default function PublishedStorePage() {
                 className="w-full h-full object-cover hover:scale-110 transition-transform"
                 onError={(e) => {
                   const img = e.target as HTMLImageElement;
-                  // If current image fails, try ipfs.io gateway
-                  if (!img.src.includes('ipfs.io')) {
-                    img.src = product.image.replace('gateway.pinata.cloud', 'ipfs.io');
-                  } else if (!img.src.includes('cloudflare-ipfs.com')) {
-                    // If ipfs.io fails, try Cloudflare
-                    img.src = product.image.replace('gateway.pinata.cloud', 'cloudflare-ipfs.com');
+                  const ipfsHash = product.image.split('/').pop(); // Extract hash from URL
+                  
+                  if (!ipfsHash) {
+                    img.src = 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+                    return;
+                  }
+
+                  const gateways = getIPFSGatewayUrls(ipfsHash);
+                  const currentIndex = gatewayIndices[product.id] || 0;
+
+                  if (currentIndex < gateways.length - 1) {
+                    // Try next gateway
+                    const nextIndex = currentIndex + 1;
+                    console.log(`🔄 [${product.name}] Trying gateway ${nextIndex + 1}/${gateways.length}:`, gateways[nextIndex]);
+                    setGatewayIndices(prev => ({ ...prev, [product.id]: nextIndex }));
+                    img.src = gateways[nextIndex];
                   } else {
-                    // If all gateways fail, use fallback
+                    // All gateways exhausted, use fallback
+                    console.log(`❌ [${product.name}] All IPFS gateways failed, using fallback`);
                     img.src = 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
                   }
                 }}
@@ -663,11 +675,23 @@ export default function PublishedStorePage() {
                   className="w-full rounded-lg"
                   onError={(e) => {
                     const img = e.target as HTMLImageElement;
-                    if (!img.src.includes('ipfs.io')) {
-                      img.src = selectedProduct.image.replace('gateway.pinata.cloud', 'ipfs.io');
-                    } else if (!img.src.includes('cloudflare-ipfs.com')) {
-                      img.src = selectedProduct.image.replace('gateway.pinata.cloud', 'cloudflare-ipfs.com');
+                    const ipfsHash = selectedProduct.image.split('/').pop();
+                    
+                    if (!ipfsHash) {
+                      img.src = 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+                      return;
+                    }
+
+                    const gateways = getIPFSGatewayUrls(ipfsHash);
+                    const currentIndex = gatewayIndices[selectedProduct.id] || 0;
+
+                    if (currentIndex < gateways.length - 1) {
+                      const nextIndex = currentIndex + 1;
+                      console.log(`🔄 [Modal] Trying gateway ${nextIndex + 1}/${gateways.length}`);
+                      setGatewayIndices(prev => ({ ...prev, [selectedProduct.id]: nextIndex }));
+                      img.src = gateways[nextIndex];
                     } else {
+                      console.log(`❌ [Modal] All gateways failed`);
                       img.src = 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
                     }
                   }}
@@ -738,10 +762,20 @@ export default function PublishedStorePage() {
                       onError={(e) => {
                         const img = e.target as HTMLImageElement;
                         if (product?.image) {
-                          if (!img.src.includes('ipfs.io')) {
-                            img.src = product.image.replace('gateway.pinata.cloud', 'ipfs.io');
-                          } else if (!img.src.includes('cloudflare-ipfs.com')) {
-                            img.src = product.image.replace('gateway.pinata.cloud', 'cloudflare-ipfs.com');
+                          const ipfsHash = product.image.split('/').pop();
+                          
+                          if (!ipfsHash) {
+                            img.src = 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
+                            return;
+                          }
+
+                          const gateways = getIPFSGatewayUrls(ipfsHash);
+                          const currentIndex = gatewayIndices[product.id] || 0;
+
+                          if (currentIndex < gateways.length - 1) {
+                            const nextIndex = currentIndex + 1;
+                            setGatewayIndices(prev => ({ ...prev, [product.id]: nextIndex }));
+                            img.src = gateways[nextIndex];
                           } else {
                             img.src = 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&h=500&fit=crop';
                           }

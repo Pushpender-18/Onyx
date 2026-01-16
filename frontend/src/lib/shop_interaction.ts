@@ -206,7 +206,7 @@ export async function sendTransaction(receiverAddress: string, amountInEth: numb
 		// Get Sender's Address
 		const senderAddress = await signer.getAddress();
 		
-		console.log('📤 Sending from:', senderAddress);
+		console.log(' Sending from:', senderAddress);
 		
 		// Validate receiver address
 		if (!ethers.isAddress(receiverAddress)) {
