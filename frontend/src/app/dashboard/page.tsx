@@ -9,6 +9,7 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { Plus, ShoppingCart, TrendUp, ArrowRight, ArrowsClockwise } from 'phosphor-react';
 import { ethers } from 'ethers';
+import { useConnect } from 'wagmi';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -39,8 +40,9 @@ export default function Dashboard() {
   console.log("Chain ID: " + provider?.chainId);
 
   // const signer = getSigner(provider);
-  const { stores, products, getProducts, isLoading, getAllStores, refreshData, getTotalSalesByOwner, totalSalesByOwner, signer, setSignerWrapper } = useShop();
+  const { stores, products, getProducts, isLoading, getStoresByOwner, refreshData, getTotalSalesByOwner, totalSalesByOwner, signer, setSignerWrapper } = useShop();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const address = useConnect().data;
   const [tries, setTries] = useState(0);
 
   // Load stores from blockchain on mount
@@ -50,7 +52,7 @@ export default function Dashboard() {
         if (provider) {
           const signer = new ethers.BrowserProvider(provider);          
           setSignerWrapper(await signer.getSigner());
-          // setSignerWrapper(signer);
+          setSignerWrapper(signer);
         }
         return null;
       }
@@ -61,11 +63,11 @@ export default function Dashboard() {
       if (tries < 6) {
         setTries(tries + 1);
         if (stores.length === 0 && !isLoading) {
-          getAllStores(signer);
+          getStoresByOwner(signer);
           setTries(tries + 1);
         }
         if (stores.length === 0 && !isLoading) {
-          getAllStores(signer);
+          getStoresByOwner(signer);
           console.log("stores:", stores);
         } else if (products.length === 0 && !isLoading) {
           getProductsAndStores();

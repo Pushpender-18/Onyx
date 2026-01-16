@@ -409,6 +409,21 @@ export async function getAllShops(signer: any) {
 	}
 }
 
+// Retrieves all shops names (read operation - doesn't require correct network)
+export async function getShopsByOwner(signer: any) {
+	try {
+		const masterContract = await getMasterContract(signer); // Read operation - allow on any network
+		console.log("Master Contract: ", masterContract);
+		const address = await(await signer.getSigner()).getAddress();
+		const shops = await masterContract.getShopsByOwner(address);
+		console.log('Fetched shops:', shops);
+		return shops;
+	} catch (error) {
+		console.error('Error fetching shops:', error);
+		throw error;
+	}
+}
+
 // Retrieves shop details by name (read operation - doesn't require correct network)
 export async function getShopDetails(shopName: string, signer: any) {
 	try {
