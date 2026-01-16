@@ -29,14 +29,14 @@ const itemVariants = {
 
 export default function StoresPage() {
   const router = useRouter();
-  const { stores, products, isLoading, error, getAllStores, deleteStore, signer } = useShop();
+  const { stores, products, isLoading, error, getStoresByOwner, deleteStore, signer } = useShop();
   const [showDeleteModal, setShowDeleteModal] = React.useState(false);
   const [storeToDelete, setStoreToDelete] = React.useState<{ id: string; name: string } | null>(null);
 
   // Load stores from blockchain on mount
   useEffect(() => {
     if (stores.length === 0 && !isLoading) {
-      getAllStores(signer);
+      getStoresByOwner(signer);
     }
   }, []);
   
@@ -46,7 +46,7 @@ export default function StoresPage() {
   };
 
   const handleSyncStores = async () => {
-    await getAllStores(signer);
+    await getStoresByOwner(signer);
   };
 
   const handleDeleteClick = (storeId: string, storeName: string) => {
