@@ -31,6 +31,7 @@ interface ShopContextType {
   setSignerWrapper: (signer: any) => void;
   createStore: (name: string, templateId: string, description: string, configuration: string, signer: any) => Promise<Store | null>;
   getAllStores: (signer: any) => Promise<Store[]>;
+  getStoresByOwner: (signer: any) => Promise<Store[]>;
   getStoreByName: (name: string, signer: any) => Promise<Store | null>;
   updateStore: (storeId: string, updates: Partial<Store>) => void;
   updateConfiguration: (shopName: string, shopAddress: string, configuration: string, newShopName: string, signer: any) => Promise<boolean>;
@@ -248,6 +249,98 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       setError(errorMessage);
       setIsLoading(false);
       return stores; // Return cached stores
+    }
+  };
+
+  // Get stores by owner address
+  const getStoresByOwner = async (signer: any): Promise<Store[]> => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+
+      const shopAddresses = await shopInteraction.getShopsByOwner(signer);
+      console.log('📦 Received shop addresses:', shopAddresses);
+      
+      if (!shopAddresses || shopAddresses.length === 0) {
+        console.log('📭 No shops found on blockchain');
+        setStores([]);
+        setIsLoading(false);
+        return [];
+      }
+      
+      // Get deleted store IDs from localStorage
+      const deletedIds = getDeletedStoreIds();
+      console.log('🗑️ Deleted store IDs:', [...deletedIds]);
+      
+      // Convert blockchain data to Store objects and filter by owner
+      console.log('🔄 Fetching details for each shop and filtering by owner...');
+      
+
+      const storesData: (Store | null)[] = await Promise.all(
+        shopAddresses.map(async (shopAddress: string) => {
+          try {
+            
+            // Skip if this store was deleted by the user
+            if (deletedIds.has(shopAddress)) {
+              return null;
+            }
+            
+            // Now get the actual shop details from the Shop contract
+            const shopDetailsResult = await shopInteraction.getShopDetailsFromContract(shopAddress, signer);
+            console.log(`   Got details for ${shopAddress}:`, shopDetailsResult);
+            console.log(`   isPublished value:`, shopDetailsResult.isPublished);
+            
+            const storeData = {
+              id: shopAddress, // Use contract address as ID
+              userId: shopDetailsResult.owner || '',
+              name: shopDetailsResult.shopName || shopAddress,
+              description: shopDetailsResult.description || '',
+              templateId: shopDetailsResult.shopType || 'minimal',
+              customization: {
+                primaryColor: '#1a1a1a',
+                secondaryColor: '#d4af37',
+                layout: shopDetailsResult.configuration ? JSON.parse(shopDetailsResult.configuration) : [],
+                fonts: {
+                  heading: 'Inter',
+                  body: 'Inter',
+                },
+              },
+              isPublished: shopDetailsResult.isPublished || false,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            };
+            
+            console.log(`  📝 Store data to be added:`, storeData);
+            return storeData;
+          } catch (err) {
+            console.error(`   Error fetching shop details for ${shopAddress}:`, err);
+            return null;
+          }
+        })
+      );
+
+      const validStores = storesData.filter((store): store is Store => store !== null);
+      console.log(' Successfully loaded stores:', validStores);
+      setStores(validStores);
+      setIsLoading(false);
+      return validStores;
+      
+    } catch (err: any) {
+      console.error('❌ Error fetching stores by owner:', err);
+      
+      let errorMessage = 'Failed to fetch stores';
+      if (err.message?.includes('Wallet not connected')) {
+        errorMessage = 'Please connect your wallet first';
+      } else if (err.message?.includes('pending')) {
+        errorMessage = 'Wallet connection request pending. Please check your wallet.';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      setIsLoading(false);
+      return [];
     }
   };
 
@@ -719,6 +812,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     setSignerWrapper,
     createStore,
     getAllStores,
+    getStoresByOwner,
     getStoreByName,
     updateStore,
     updateConfiguration,
