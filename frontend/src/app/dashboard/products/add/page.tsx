@@ -267,7 +267,7 @@ export default function AddProductPage() {
       
       // Update toast to show MetaMask is needed
       toast.loading('Please confirm transaction in MetaMask...', { id: loadingToast });
-      
+
       const newProduct = await addProductToBlockchain(currentStore.id, {
         name: productData.name,
         storeId: currentStore.id,
@@ -280,7 +280,7 @@ export default function AddProductPage() {
           tags: [],
         },
         isPublished: true,
-      }, signer);
+      }, await signer.getSigner());
 
       if (newProduct) {
         toast.success('Product added successfully!', { id: loadingToast });

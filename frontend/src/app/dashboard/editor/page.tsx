@@ -242,7 +242,7 @@ export default function StoreEditor() {
 
     // Navigate to the Add Product page with store info
     const currentUrl = window.location.pathname + window.location.search;
-    router.push(`/dashboard/products/add?storeId=MNT{currentStore.id}&storeName=MNT{encodeURIComponent(currentStore.name)}&returnUrl=${encodeURIComponent(currentUrl)}`);
+    router.push(`/dashboard/products/add?storeId=${currentStore.id}&storeName=${(currentStore.name)}&returnUrl=${encodeURIComponent(currentUrl)}`);
   };
 
   // Publish handler
